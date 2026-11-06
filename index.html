@@ -819,43 +819,306 @@ document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
 document.addEventListener('gestureend', function(e) { e.preventDefault(); });
 
 const COLORS = [
-  [9999, "Toute couleur", "CCCCCC"],
-  [0, "Noir", "05131D"],
-  [15, "Blanc", "FFFFFF"],
-  [4, "Rouge", "C91A09"],
-  [1, "Bleu", "0055BF"],
-  [14, "Jaune", "F2CD37"],
-  [2, "Vert", "237841"],
-  [25, "Orange", "FE8A18"],
-  [5, "Rose foncé", "C870A0"],
-  [26, "Magenta", "901F76"],
-  [272, "Bleu foncé", "0A3463"],
-  [73, "Bleu moyen", "5A93DB"],
-  [11, "Turquoise", "008F9B"],
-  [322, "Azur moyen", "36AEBF"],
-  [288, "Vert foncé", "184632"],
-  [10, "Vert vif", "4B9F4A"],
-  [226, "Jaune clair vif", "FFF03A"],
-  [78, "Chair claire", "F6D7B3"],
-  [92, "Chair", "CC702A"],
-  [19, "Beige", "E4CD9E"],
-  [28, "Beige foncé", "958A73"],
-  [6, "Marron", "582A12"],
-  [70, "Marron rougeâtre", "582A12"],
-  [308, "Marron foncé", "352100"],
-  [484, "Orange foncé", "A95500"],
-  [71, "Gris bleuté clair", "A0A5A9"],
-  [72, "Gris bleuté foncé", "6C6E68"],
-  [503, "Gris très clair", "E6E3DA"],
-  [378, "Vert sable", "A0BCAC"],
-  [379, "Bleu sable", "6074A1"],
-  [47, "Transparent", "FCFCFC"],
-  [36, "Transp. rouge", "C91A09"],
-  [34, "Transp. vert", "237841"],
-  [43, "Transp. bleu clair", "AEEFEC"],
-  [33, "Transp. bleu", "0020A0"],
-  [46, "Transp. jaune", "F5CD2A"],
-  [182, "Transp. orange", "F08F1C"]
+  [
+    9999,
+    "Toute couleur",
+    "CCCCCC"
+  ],
+  [
+    0,
+    "Noir",
+    "05131D"
+  ],
+  [
+    15,
+    "Blanc",
+    "FFFFFF"
+  ],
+  [
+    71,
+    "Gris bleuté clair",
+    "A0A5A9"
+  ],
+  [
+    72,
+    "Gris bleuté foncé",
+    "6C6E68"
+  ],
+  [
+    4,
+    "Rouge",
+    "C91A09"
+  ],
+  [
+    1,
+    "Bleu",
+    "0055BF"
+  ],
+  [
+    14,
+    "Jaune",
+    "F2CD37"
+  ],
+  [
+    2,
+    "Vert",
+    "237841"
+  ],
+  [
+    25,
+    "Orange",
+    "FE8A18"
+  ],
+  [
+    70,
+    "Marron rougeâtre",
+    "694027"
+  ],
+  [
+    19,
+    "Beige (Tan)",
+    "E4CD9E"
+  ],
+  [
+    28,
+    "Beige foncé (Dark Tan)",
+    "958A73"
+  ],
+  [
+    272,
+    "Bleu foncé",
+    "0A3463"
+  ],
+  [
+    59,
+    "Rouge foncé",
+    "720E0F"
+  ],
+  [
+    288,
+    "Vert foncé",
+    "184632"
+  ],
+  [
+    27,
+    "Vert lime",
+    "BBE90B"
+  ],
+  [
+    10,
+    "Vert vif (Bright Green)",
+    "4B9F4A"
+  ],
+  [
+    322,
+    "Azur moyen",
+    "36AEBF"
+  ],
+  [
+    153,
+    "Azur foncé",
+    "078BC9"
+  ],
+  [
+    73,
+    "Bleu moyen",
+    "5A93DB"
+  ],
+  [
+    484,
+    "Orange foncé",
+    "A95500"
+  ],
+  [
+    191,
+    "Orange clair",
+    "F8BB3D"
+  ],
+  [
+    226,
+    "Jaune clair vif",
+    "FFF03A"
+  ],
+  [
+    368,
+    "Jaune vif (Cool Yellow)",
+    "FDF38C"
+  ],
+  [
+    1005,
+    "Corail",
+    "FF698F"
+  ],
+  [
+    5,
+    "Rose foncé",
+    "C870A0"
+  ],
+  [
+    9,
+    "Rose clair",
+    "FECCCF"
+  ],
+  [
+    26,
+    "Magenta",
+    "901F76"
+  ],
+  [
+    351,
+    "Magenta clair",
+    "F57D82"
+  ],
+  [
+    24,
+    "Violet",
+    "81007B"
+  ],
+  [
+    89,
+    "Violet foncé",
+    "3F2A56"
+  ],
+  [
+    31,
+    "Lavande moyenne",
+    "AC78BA"
+  ],
+  [
+    114,
+    "Lavande",
+    "E1D5ED"
+  ],
+  [
+    323,
+    "Azur clair",
+    "46D2F3"
+  ],
+  [
+    212,
+    "Bleu clair",
+    "91BBCA"
+  ],
+  [
+    379,
+    "Bleu sable",
+    "6074A1"
+  ],
+  [
+    378,
+    "Vert sable",
+    "A0BCAC"
+  ],
+  [
+    326,
+    "Vert olive",
+    "9B9A5A"
+  ],
+  [
+    11,
+    "Turquoise (Teal)",
+    "008F9B"
+  ],
+  [
+    92,
+    "Chair (Nougat)",
+    "CC702A"
+  ],
+  [
+    78,
+    "Chair claire",
+    "F6D7B3"
+  ],
+  [
+    161,
+    "Chair foncée",
+    "AD5D37"
+  ],
+  [
+    308,
+    "Marron foncé",
+    "352100"
+  ],
+  [
+    6,
+    "Marron (vintage)",
+    "582A12"
+  ],
+  [
+    503,
+    "Gris très clair",
+    "E6E3DA"
+  ],
+  [
+    86,
+    "Gris clair (vintage)",
+    "9C9C9C"
+  ],
+  [
+    8,
+    "Gris foncé (vintage)",
+    "4D4D4D"
+  ],
+  [
+    47,
+    "Transparent",
+    "FCFCFC"
+  ],
+  [
+    36,
+    "Transp. rouge",
+    "C91A09"
+  ],
+  [
+    33,
+    "Transp. bleu",
+    "0020A0"
+  ],
+  [
+    43,
+    "Transp. bleu clair",
+    "AEEFEC"
+  ],
+  [
+    34,
+    "Transp. vert",
+    "237841"
+  ],
+  [
+    46,
+    "Transp. jaune",
+    "F5CD2A"
+  ],
+  [
+    182,
+    "Transp. orange",
+    "F08F1C"
+  ],
+  [
+    42,
+    "Transp. vert néon",
+    "F8F184"
+  ],
+  [
+    98,
+    "Transp. orange néon",
+    "FF8008"
+  ],
+  [
+    297,
+    "Transp. rose",
+    "E4ADC8"
+  ],
+  [
+    52,
+    "Transp. violet",
+    "A5A5CB"
+  ],
+  [
+    40,
+    "Transp. noir / fumé",
+    "635F52"
+  ]
 ];
 
 const colName = id => (COLORS.find(c => c[0] == id) || [0, "Couleur " + id])[1];
@@ -1385,7 +1648,10 @@ function exportMissingSetPartsCSV() {
     return alert("Félicitations ! Vous possédez déjà toutes les pièces pour ce set.");
   }
 
-  const csvContent = "Part,Color,Quantity\n" + missingRows.join("\n") + "\n";
+  const csvContent = "Part,Color,Quantity
+" + missingRows.join("
+") + "
+";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csvContent], { type: "text/csv" }));
   a.download = `manquants-set-${currentSetNum}.csv`;
@@ -1398,8 +1664,12 @@ $("q-set").onkeydown = e => { if(e.key === "Enter") searchSet(); };
 
 /* Rebrickable CSV Export */
 function csv() {
-  const q = s => /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  return "Part,Color,Quantity\n" + stock.map(x => q(String(x.part)) + "," + x.color + "," + x.qty).join("\n") + "\n";
+  const q = s => /[",
+]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  return "Part,Color,Quantity
+" + stock.map(x => q(String(x.part)) + "," + x.color + "," + x.qty).join("
+") + "
+";
 }
 
 $("exp").onclick = () => {
@@ -1579,7 +1849,7 @@ function renderRes() {
     return;
   }
 
-  const QUICK_SWATCHES = [0, 15, 4, 1, 14, 2, 25, 71];
+  const QUICK_SWATCHES = [0, 15, 4, 59, 1, 14, 2, 25, 71];
 
   $("res").innerHTML = cand.map((x, i) => `<div class="cand-card">
     ${imgTag(x)}
@@ -1649,8 +1919,7 @@ document.addEventListener("error", e => {
       } else if (currentSrc === photoUrl && t.dataset.fb !== photoUrl) {
         t.src = t.dataset.fb;
         return;
-      }
-    }
+      }}
 
     if (currentSrc !== t.dataset.fb) {
       t.src = t.dataset.fb;
