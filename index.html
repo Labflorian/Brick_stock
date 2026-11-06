@@ -264,7 +264,7 @@ input:focus, select:focus { border-color: var(--primary); }
 }
 .qty b { min-width: 22px; text-align: center; font-size: 14px; }
 
-/* Set Cards */
+/* Set Cards & Progress Bar */
 .set-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -295,6 +295,21 @@ input:focus, select:focus { border-color: var(--primary); }
 .set-actions {
   display: flex;
   gap: 8px;
+}
+
+.progress-container {
+  width: 100%;
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 6px 0 10px 0;
+  border: 1px solid var(--card-border);
+}
+.progress-bar {
+  height: 100%;
+  background: var(--success);
+  transition: width 0.3s ease;
 }
 
 .set-parts-grid {
@@ -375,31 +390,21 @@ video {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.target-box {
-  width: 50%;
-  height: 50%;
-  border: 2px dashed rgba(255,255,255,0.75);
-  border-radius: 10px;
-  position: relative;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .color-target-spot {
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--primary);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  border: 2px solid #ffffff;
   border-radius: 50%;
-  position: relative;
-  box-shadow: 0 0 10px rgba(227, 0, 11, 0.6);
+  box-shadow: 0 0 8px rgba(0,0,0,0.8), inset 0 0 4px rgba(0,0,0,0.5);
   pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: top 0.15s ease, left 0.15s ease;
+  z-index: 10;
 }
 
 .color-target-spot::after {
@@ -407,22 +412,24 @@ video {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   background: var(--primary);
   border-radius: 50%;
+  box-shadow: 0 0 4px rgba(227, 0, 11, 0.8);
 }
 
-.target-box::before {
-  content: "Pincher pour zoomer la caméra";
+.vw-hint-text {
   position: absolute;
-  top: 6px;
+  top: 8px;
   left: 0; right: 0;
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   color: rgba(255,255,255,0.85);
   font-weight: 600;
   letter-spacing: 0.3px;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
 }
 
 .scan-line {
@@ -441,7 +448,6 @@ video {
 }
 
 .scanning .scan-line { display: block; }
-.scanning .target-box { border-color: var(--primary); }
 
 .cam-zoom-badge {
   position: absolute;
@@ -749,11 +755,10 @@ video {
     <div class="vw-container" id="vw-box">
       <video id="v" playsinline muted autoplay></video>
       <div class="viewfinder-overlay">
-        <div class="target-box">
-          <div class="scan-line"></div>
-          <div class="color-target-spot" title="Point d'analyse couleur"></div>
-        </div>
+        <div class="color-target-spot" id="color-target-spot" title="Point d'analyse couleur (Touchez pour viser)"></div>
       </div>
+      <div class="vw-hint-text">Touchez l'écran pour viser la couleur · Pincez pour zoomer</div>
+      <div class="scan-line"></div>
       <div class="cam-zoom-badge" id="zoom-badge">Zoom 1.0x</div>
     </div>
 
@@ -767,7 +772,7 @@ video {
 
     <div class="row" style="margin: 0; align-items: center; justify-content: space-between;">
       <label class="chk">
-        <input type="checkbox" id="autocol" checked> Couleur auto (HSL + Balance)
+        <input type="checkbox" id="autocol" checked> Couleur auto (Filtrage fond + Tap-target)
       </label>
       <label class="chk">
         <input type="checkbox" id="auto"> Auto (2,5s)
@@ -857,6 +862,8 @@ const colName = id => (COLORS.find(c => c[0] == id) || [0, "Couleur " + id])[1];
 const colRgb = id => "#" + ((COLORS.find(c => c[0] == id) || [0,0,"CCCCCC"])[2]);
 const $ = id => document.getElementById(id);
 const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const triggerHaptic = () => { if (navigator.vibrate) navigator.vibrate(40); };
 
 let stock = [];
 try {
@@ -1007,7 +1014,7 @@ COLORS.forEach(c => {
   }
 });
 
-/* ADVANCED COLOR RECOGNITION ENGINE (CIE L*a*b* + DOMINANT CLUSTER QUANTIZATION + CENTER GAUSSIAN WEIGHTING) */
+/* ADVANCED COLOR RECOGNITION ENGINE (CIE L*a*b* + CHROMA SATURATION FILTER + TOUCH TARGETING) */
 function hex2rgb(h) { return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
 
 function rgbToLab(r, g, b) {
@@ -1041,86 +1048,92 @@ const PALETTE_LAB = COLORS.map(c => {
   return { id: c[0], name: c[1], hex: c[2], rgb, lab: rgbToLab(rgb[0], rgb[1], rgb[2]) };
 });
 
+// Interactive Touch Target Spot
+let sampleX = 0.5;
+let sampleY = 0.5;
+
+const vwBoxEl = $("vw-box");
+vwBoxEl.addEventListener("click", e => {
+  if (e.touches && e.touches.length > 1) return;
+  const rect = vwBoxEl.getBoundingClientRect();
+  const clickX = (e.clientX - rect.left) / rect.width;
+  const clickY = (e.clientY - rect.top) / rect.height;
+  
+  sampleX = Math.max(0.1, Math.min(0.9, clickX));
+  sampleY = Math.max(0.1, Math.min(0.9, clickY));
+
+  const spot = $("color-target-spot");
+  if (spot) {
+    spot.style.left = (sampleX * 100) + "%";
+    spot.style.top = (sampleY * 100) + "%";
+  }
+  triggerHaptic();
+});
+
 function guessColor(canvas) {
   const ctx = canvas.getContext("2d");
   const w = canvas.width, h = canvas.height;
 
-  // Ultra-Focused Micro-ROI: 12% x 12% strictly centered on the crosshair
-  const sw = Math.max(16, Math.round(w * 0.12));
-  const sh = Math.max(16, Math.round(h * 0.12));
-  const sx = Math.round((w - sw) / 2);
-  const sy = Math.round((h - sh) / 2);
+  // Micro-ROI around targeted point (8% of width/height)
+  const sw = Math.max(14, Math.round(w * 0.08));
+  const sh = Math.max(14, Math.round(h * 0.08));
+  const sx = Math.round((w * sampleX) - (sw / 2));
+  const sy = Math.round((h * sampleY) - (sh / 2));
 
-  const imgData = ctx.getImageData(sx, sy, sw, sh).data;
+  const imgData = ctx.getImageData(Math.max(0, sx), Math.max(0, sy), sw, sh).data;
   const cx = sw / 2, cy = sh / 2;
   const radiusSq = (cx * cx + cy * cy) || 1;
 
-  // Color Quantization (8x8x8 bins) within the micro reticle spot
-  const binWeights = new Map();
-  const binPixels = new Map();
+  let samples = [];
 
   for (let y = 0; y < sh; y++) {
     for (let x = 0; x < sw; x++) {
       const idx = (y * sw + x) * 4;
       const r = imgData[idx], g = imgData[idx+1], b = imgData[idx+2];
 
-      const dx = x - cx, dy = y - cy;
-      const normDistSq = (dx * dx + dy * dy) / radiusSq;
-
-      // Steep Gaussian Weighting: center pixel has 100% weight, edges of reticle decay to < 1%
-      const distWeight = Math.exp(-9.0 * normDistSq);
-
       const lab = rgbToLab(r, g, b);
       const L = lab[0];
 
-      // Filter specular highlights (gloss glare L* > 95) and extreme shadows (L* < 5)
-      if (L < 5 || L > 95) continue;
+      // Exclude specular highlights & deep shadows
+      if (L < 8 || L > 94) continue;
 
-      const qr = Math.floor(r / 32), qg = Math.floor(g / 32), qb = Math.floor(b / 32);
-      const binKey = (qr << 6) | (qg << 3) | qb;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      const sat = max === 0 ? 0 : (max - min) / max;
 
-      binWeights.set(binKey, (binWeights.get(binKey) || 0) + distWeight);
-      if (!binPixels.has(binKey)) binPixels.set(binKey, []);
-      binPixels.get(binKey).push([r, g, b, distWeight]);
+      const dx = x - cx, dy = y - cy;
+      const distWeight = Math.exp(-4.0 * ((dx * dx + dy * dy) / radiusSq));
+
+      samples.push({ r, g, b, lab, sat, weight: distWeight });
     }
   }
 
-  if (binWeights.size === 0) return 9999;
+  if (!samples.length) return 9999;
 
-  // Extract dominant mode cluster at the exact center
-  let maxWeight = 0, dominantBin = -1;
-  for (const [binKey, weight] of binWeights.entries()) {
-    if (weight > maxWeight) {
-      maxWeight = weight;
-      dominantBin = binKey;
-    }
+  // Filter background noise based on saturation
+  const avgSat = samples.reduce((acc, s) => acc + s.sat, 0) / samples.length;
+  if (avgSat > 0.18) {
+    samples = samples.filter(s => s.sat >= avgSat * 0.7);
   }
 
-  if (dominantBin === -1) return 9999;
+  if (!samples.length) return 9999;
 
-  // Compute weighted average RGB of central piece cluster
-  const cluster = binPixels.get(dominantBin);
-  let sumR = 0, sumG = 0, sumB = 0, totalW = 0;
-  for (const [r, g, b, w] of cluster) {
-    sumR += r * w;
-    sumG += g * w;
-    sumB += b * w;
-    totalW += w;
+  // Weighted CIELAB average
+  let sumL = 0, sumA = 0, sumB = 0, totalW = 0;
+  for (const s of samples) {
+    sumL += s.lab[0] * s.weight;
+    sumA += s.lab[1] * s.weight;
+    sumB += s.lab[2] * s.weight;
+    totalW += s.weight;
   }
 
-  const avgR = sumR / totalW;
-  const avgG = sumG / totalW;
-  const avgB = sumB / totalW;
+  const targetLab = [sumL / totalW, sumA / totalW, sumB / totalW];
 
-  const sampleLab = rgbToLab(avgR, avgG, avgB);
-
-  // Perceptual match in CIELAB space
   let bestId = 9999;
   let minDiff = 1e9;
 
   for (const p of PALETTE_LAB) {
     if (p.id === 9999) continue;
-    const diff = deltaE(sampleLab, p.lab);
+    const diff = deltaE(targetLab, p.lab);
     if (diff < minDiff) {
       minDiff = diff;
       bestId = p.id;
@@ -1165,6 +1178,7 @@ function add(part, name, img, color) {
   if(it) it.qty++;
   else stock.push({ k, part, name, img, color, qty: 1, addedAt: Date.now() });
   save(); render();
+  triggerHaptic();
   showToast("+1 " + (name || part) + " (" + colName(color) + ")");
 }
 
@@ -1185,7 +1199,7 @@ function render() {
     if(sort === "qty-desc") return b.qty - a.qty;
     if(sort === "qty-asc") return a.qty - b.qty;
     if(sort === "name-asc") return (a.name || "").localeCompare(b.name || "");
-    if(sort === "part-asc") return String(a.part).localeCompare(String(b.part), undefined, {numeric: true});
+    if(sort === "part-asc") return String(a.part).localeCompare(String(a.part), undefined, {numeric: true});
     if(sort === "color-asc") return colName(a.color).localeCompare(colName(b.color));
     return (b.addedAt || 0) - (a.addedAt || 0);
   });
@@ -1221,6 +1235,7 @@ $("list").onclick = e => {
   it.qty += +b.dataset.d;
   if(it.qty <= 0) stock = stock.filter(x => x !== it);
   save(); render();
+  triggerHaptic();
 };
 
 $("q").oninput = render;
@@ -1229,11 +1244,15 @@ $("f-cat").onchange = render;
 $("s-sort").onchange = render;
 
 /* SETS TAB LOGIC */
+let currentSetParts = [];
+let currentSetNum = "";
+
 async function searchSet() {
   const rawNum = $("q-set").value.trim();
   if(!rawNum) return;
   const setNum = rawNum.includes("-") ? rawNum : rawNum + "-1";
   const cleanNum = setNum.split("-")[0];
+  currentSetNum = setNum;
 
   const statusEl = $("set-status");
   const resEl = $("set-results");
@@ -1299,6 +1318,7 @@ async function fetchSetParts(setNum) {
     if(!r.ok) throw new Error("Erreur HTTP " + r.status);
     const data = await r.json();
     const parts = data.results || [];
+    currentSetParts = parts;
 
     if(!parts.length) {
       container.innerHTML = `<div class="empty">Aucune pièce trouvée pour ce set.</div>`;
@@ -1324,15 +1344,56 @@ async function fetchSetParts(setNum) {
       </div>`;
     }).join("");
 
-    container.innerHTML = `<div style="margin-top:12px; font-size:12px; font-weight:700; display:flex; justify-content:space-between;">
-      <span>Pièces trouvées dans votre stock :</span>
-      <span style="color:var(--primary);">${matchCount} / ${parts.length} réfs</span>
-    </div>
-    <div class="set-parts-grid">${partsHtml}</div>`;
+    const completionPct = Math.round((matchCount / parts.length) * 100);
+    const barColor = completionPct === 100 ? 'var(--success)' : (completionPct > 50 ? 'var(--warning)' : 'var(--primary)');
+
+    container.innerHTML = `
+      <div style="margin-top:12px; font-size:12px; font-weight:700; display:flex; justify-content:space-between; align-items:center;">
+        <span>Pièces trouvées dans votre stock :</span>
+        <span style="color:${barColor};">${completionPct}% (${matchCount} / ${parts.length} réfs)</span>
+      </div>
+      <div class="progress-container">
+        <div class="progress-bar" style="width:${completionPct}%; background:${barColor};"></div>
+      </div>
+      <button class="btn sm full" id="exp-missing-csv" style="margin-bottom:10px;">📥 Exporter les pièces manquantes (CSV)</button>
+      <div class="set-parts-grid">${partsHtml}</div>`;
+
+    $("exp-missing-csv").onclick = exportMissingSetPartsCSV;
 
   } catch(e) {
     container.innerHTML = `<div class="empty" style="color:var(--primary);">Erreur lors du chargement : ${esc(e.message)}</div>`;
   }
+}
+
+function exportMissingSetPartsCSV() {
+  if (!currentSetParts.length) return alert("Aucun inventaire chargé.");
+  
+  let missingRows = [];
+  currentSetParts.forEach(p => {
+    const partNum = p.part.part_num;
+    const colorId = p.color.id;
+    const key = partNum + "|" + colorId;
+    const inStockItem = stock.find(x => x.k === key);
+    const inStockQty = inStockItem ? inStockItem.qty : 0;
+    const missingQty = p.quantity - inStockQty;
+    if (missingQty > 0) {
+      missingRows.push(`"${partNum}",${colorId},${missingQty}`);
+    }
+  });
+
+  if (!missingRows.length) {
+    return alert("Félicitations ! Vous possédez déjà toutes les pièces pour ce set.");
+  }
+
+  const csvContent = "Part,Color,Quantity
+" + missingRows.join("
+") + "
+";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csvContent], { type: "text/csv" }));
+  a.download = `manquants-set-${currentSetNum}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast("CSV pièces manquantes exporté !");
 }
 
 $("btn-search-set").onclick = searchSet;
@@ -1340,8 +1401,12 @@ $("q-set").onkeydown = e => { if(e.key === "Enter") searchSet(); };
 
 /* Rebrickable CSV Export */
 function csv() {
-  const q = s => /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  return "Part,Color,Quantity\n" + stock.map(x => q(String(x.part)) + "," + x.color + "," + x.qty).join("\n") + "\n";
+  const q = s => /[",
+]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  return "Part,Color,Quantity
+" + stock.map(x => q(String(x.part)) + "," + x.color + "," + x.qty).join("
+") + "
+";
 }
 
 $("exp").onclick = () => {
@@ -1383,9 +1448,7 @@ function setCameraZoom(z) {
   }
 }
 
-const vwBox = $("vw-box");
-
-vwBox.addEventListener("touchstart", e => {
+vwBoxEl.addEventListener("touchstart", e => {
   if (e.touches.length === 2) {
     e.preventDefault();
     touchStartDist = Math.hypot(
@@ -1396,7 +1459,7 @@ vwBox.addEventListener("touchstart", e => {
   }
 }, { passive: false });
 
-vwBox.addEventListener("touchmove", e => {
+vwBoxEl.addEventListener("touchmove", e => {
   if (e.touches.length === 2 && touchStartDist > 0) {
     e.preventDefault();
     const currDist = Math.hypot(
@@ -1408,7 +1471,7 @@ vwBox.addEventListener("touchmove", e => {
   }
 }, { passive: false });
 
-vwBox.addEventListener("touchend", e => {
+vwBoxEl.addEventListener("touchend", e => {
   if (e.touches.length < 2) {
     touchStartDist = 0;
   }
@@ -1423,7 +1486,7 @@ async function startCam() {
     });
     v.srcObject = stream;
     await v.play();
-    st("Caméra prête. Pincez l'écran pour zoomer.");
+    st("Caméra prête. Touchez l'écran pour viser la couleur.");
     return true;
   } catch(e) {
     try {
@@ -1549,6 +1612,7 @@ $("res").onclick = e => {
   if (swatch) {
     const cId = +swatch.dataset.cid;
     updateSelectedColor(cId);
+    triggerHaptic();
     return;
   }
 
