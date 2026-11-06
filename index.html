@@ -387,6 +387,30 @@ video {
   border-radius: 10px;
   position: relative;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-target-spot {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 0 10px rgba(227, 0, 11, 0.6);
+  pointer-events: none;
+}
+
+.color-target-spot::after {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 4px;
+  background: var(--primary);
+  border-radius: 50%;
 }
 
 .target-box::before {
@@ -727,6 +751,7 @@ video {
       <div class="viewfinder-overlay">
         <div class="target-box">
           <div class="scan-line"></div>
+          <div class="color-target-spot" title="Point d'analyse couleur"></div>
         </div>
       </div>
       <div class="cam-zoom-badge" id="zoom-badge">Zoom 1.0x</div>
@@ -1020,15 +1045,17 @@ function guessColor(canvas) {
   const ctx = canvas.getContext("2d");
   const w = canvas.width, h = canvas.height;
 
-  // Sample center 40% x 40% region with radial Gaussian weighting
-  const sx = Math.round(w * 0.30), sy = Math.round(h * 0.30);
-  const sw = Math.round(w * 0.40), sh = Math.round(h * 0.40);
+  // Ultra-Focused Micro-ROI: 12% x 12% strictly centered on the crosshair
+  const sw = Math.max(16, Math.round(w * 0.12));
+  const sh = Math.max(16, Math.round(h * 0.12));
+  const sx = Math.round((w - sw) / 2);
+  const sy = Math.round((h - sh) / 2);
+
   const imgData = ctx.getImageData(sx, sy, sw, sh).data;
-
   const cx = sw / 2, cy = sh / 2;
-  const maxDistSq = (cx * cx + cy * cy) || 1;
+  const radiusSq = (cx * cx + cy * cy) || 1;
 
-  // Step 1: Color Quantization into 8x8x8 RGB Bins to find Dominant Cluster (Mode)
+  // Color Quantization (8x8x8 bins) within the micro reticle spot
   const binWeights = new Map();
   const binPixels = new Map();
 
@@ -1037,17 +1064,18 @@ function guessColor(canvas) {
       const idx = (y * sw + x) * 4;
       const r = imgData[idx], g = imgData[idx+1], b = imgData[idx+2];
 
-      // Radial center weight (center pixels carry up to 3x weight)
       const dx = x - cx, dy = y - cy;
-      const distWeight = 1.0 + 2.0 * (1.0 - (dx * dx + dy * dy) / maxDistSq);
+      const normDistSq = (dx * dx + dy * dy) / radiusSq;
+
+      // Steep Gaussian Weighting: center pixel has 100% weight, edges of reticle decay to < 1%
+      const distWeight = Math.exp(-9.0 * normDistSq);
 
       const lab = rgbToLab(r, g, b);
       const L = lab[0];
 
-      // Exclude extreme specular glare (L* > 94) and deep dark shadows (L* < 6)
-      if (L < 6 || L > 94) continue;
+      // Filter specular highlights (gloss glare L* > 95) and extreme shadows (L* < 5)
+      if (L < 5 || L > 95) continue;
 
-      // Quantize to 8x8x8 color space (32 steps per RGB channel)
       const qr = Math.floor(r / 32), qg = Math.floor(g / 32), qb = Math.floor(b / 32);
       const binKey = (qr << 6) | (qg << 3) | qb;
 
@@ -1059,7 +1087,7 @@ function guessColor(canvas) {
 
   if (binWeights.size === 0) return 9999;
 
-  // Step 2: Extract Dominant Color Cluster
+  // Extract dominant mode cluster at the exact center
   let maxWeight = 0, dominantBin = -1;
   for (const [binKey, weight] of binWeights.entries()) {
     if (weight > maxWeight) {
@@ -1070,7 +1098,7 @@ function guessColor(canvas) {
 
   if (dominantBin === -1) return 9999;
 
-  // Step 3: Compute Center-Weighted Average RGB of Dominant Cluster
+  // Compute weighted average RGB of central piece cluster
   const cluster = binPixels.get(dominantBin);
   let sumR = 0, sumG = 0, sumB = 0, totalW = 0;
   for (const [r, g, b, w] of cluster) {
@@ -1086,7 +1114,7 @@ function guessColor(canvas) {
 
   const sampleLab = rgbToLab(avgR, avgG, avgB);
 
-  // Step 4: Perceptual Match in CIELAB Space using Delta E Distance
+  // Perceptual match in CIELAB space
   let bestId = 9999;
   let minDiff = 1e9;
 
