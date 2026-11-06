@@ -641,9 +641,9 @@ video {
 .chk input { width: auto; }
 .cand-card { flex-wrap: wrap; }
 .cand-card .btn.pri { padding: 10px 14px; font-size: 14px; }
-.quick-swatches { flex: 1 0 100%; flex-wrap: wrap; gap: 10px; margin-top: 2px; }
-.quick-swatch { width: 32px; height: 32px; border-width: 2px; }
-.quick-swatch.active { outline: 3px solid var(--primary); outline-offset: 2px; }
+.quick-swatches { flex: 1 0 100%; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.quick-swatch { width: 24px; height: 24px; }
+.quick-swatch.active { outline: 2px solid var(--primary); outline-offset: 2px; }
 .cand-col { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .cand-col.warn { color: var(--warning); }
 .cand-col .sw { width: 14px; height: 14px; }
@@ -907,11 +907,7 @@ const COLORS = [
     "Bleu foncé",
     "0A3463"
   ],
-  [
-    59,
-    "Rouge foncé",
-    "720E0F"
-  ],
+  [ 320, "Rouge foncé", "720E0F" ],
   [
     288,
     "Vert foncé",
@@ -932,11 +928,7 @@ const COLORS = [
     "Azur moyen",
     "36AEBF"
   ],
-  [
-    153,
-    "Azur foncé",
-    "078BC9"
-  ],
+  [ 321, "Azur foncé", "078BC9" ],
   [
     73,
     "Bleu moyen",
@@ -957,66 +949,26 @@ const COLORS = [
     "Jaune clair vif",
     "FFF03A"
   ],
-  [
-    368,
-    "Jaune vif (Cool Yellow)",
-    "FDF38C"
-  ],
-  [
-    1005,
-    "Corail",
-    "FF698F"
-  ],
+  [ 1062, "Jaune vif (Cool Yellow)", "FDF38C" ],
+  [ 1050, "Corail", "FF698F" ],
   [
     5,
     "Rose foncé",
     "C870A0"
   ],
-  [
-    9,
-    "Rose clair",
-    "FECCCF"
-  ],
+  [ 77, "Rose clair", "FECCCF" ],
   [
     26,
     "Magenta",
     "901F76"
   ],
-  [
-    351,
-    "Magenta clair",
-    "F57D82"
-  ],
-  [
-    24,
-    "Violet",
-    "81007B"
-  ],
-  [
-    89,
-    "Violet foncé",
-    "3F2A56"
-  ],
-  [
-    31,
-    "Lavande moyenne",
-    "AC78BA"
-  ],
-  [
-    114,
-    "Lavande",
-    "E1D5ED"
-  ],
-  [
-    323,
-    "Azur clair",
-    "46D2F3"
-  ],
-  [
-    212,
-    "Bleu clair",
-    "91BBCA"
-  ],
+  [ 351, "Rose moyen foncé", "F785B1" ],
+  [ 22, "Violet", "81007B" ],
+  [ 85, "Violet foncé", "3F3691" ],
+  [ 30, "Lavande moyenne", "AC78BA" ],
+  [ 31, "Lavande", "CDA4DE" ],
+  [ 323, "Aqua clair", "ADC3C0" ],
+  [ 212, "Bleu clair vif", "9FC3E9" ],
   [
     379,
     "Bleu sable",
@@ -1032,11 +984,7 @@ const COLORS = [
     "Vert olive",
     "9B9A5A"
   ],
-  [
-    11,
-    "Turquoise (Teal)",
-    "008F9B"
-  ],
+  [ 3, "Turquoise foncé", "008F9B" ],
   [
     92,
     "Chair (Nougat)",
@@ -1047,11 +995,7 @@ const COLORS = [
     "Chair claire",
     "F6D7B3"
   ],
-  [
-    161,
-    "Chair foncée",
-    "AD5D37"
-  ],
+  [ 1067, "Chair foncée", "AD5D37" ],
   [
     308,
     "Marron foncé",
@@ -1067,16 +1011,8 @@ const COLORS = [
     "Gris très clair",
     "E6E3DA"
   ],
-  [
-    86,
-    "Gris clair (vintage)",
-    "9C9C9C"
-  ],
-  [
-    8,
-    "Gris foncé (vintage)",
-    "4D4D4D"
-  ],
+  [ 7, "Gris clair (vintage)", "9BA19D" ],
+  [ 8, "Gris foncé (vintage)", "6D6E5C" ],
   [
     47,
     "Transparent",
@@ -1092,11 +1028,7 @@ const COLORS = [
     "Transp. bleu",
     "0020A0"
   ],
-  [
-    43,
-    "Transp. bleu clair",
-    "AEEFEC"
-  ],
+  [ 43, "Transp. bleu très clair", "AEEFEC" ],
   [
     34,
     "Transp. vert",
@@ -1117,16 +1049,8 @@ const COLORS = [
     "Transp. vert néon",
     "F8F184"
   ],
-  [
-    98,
-    "Transp. orange néon",
-    "FF8008"
-  ],
-  [
-    297,
-    "Transp. rose",
-    "E4ADC8"
-  ],
+  [ 57, "Transp. orange néon", "FF8008" ],
+  [ 230, "Transp. rose", "E4ADC8" ],
   [
     52,
     "Transp. violet",
@@ -1155,6 +1079,18 @@ try {
 } catch(e) {
   console.error("Failed to load stock from localStorage:", e);
 }
+
+function fixColors(arr) {
+  const MAP = {59:320,153:321,368:1062,1005:1050,9:77,24:22,89:85,31:30,114:31,11:3,161:1067,86:7,98:57,297:230};
+  const out = [], seen = {};
+  (arr || []).forEach(x => {
+    if (x.cv !== 2) { const n = MAP[x.color]; if (n) { x.color = n; x.k = x.part + "|" + n; } x.cv = 2; }
+    const o = seen[x.k]; if (o) o.qty += x.qty; else { seen[x.k] = x; out.push(x); }
+  });
+  return out;
+}
+stock = fixColors(stock);
+try { localStorage.setItem("brickstock", JSON.stringify(stock)); } catch(e) {}
 
 const LS = k => { try { return localStorage.getItem(k) || ""; } catch(e){ return ""; } };
 const LSset = (k, v) => { try { localStorage.setItem(k, v); } catch(e){} };
@@ -1214,7 +1150,7 @@ async function pull() {
     const f = (await r.json()).files["stock.json"];
     const j = JSON.parse(f.truncated ? await (await fetch(f.raw_url)).text() : f.content);
     if(j.t > tStamp) {
-      stock = j.stock; tStamp = j.t;
+      stock = fixColors(j.stock); tStamp = j.t;
       LSset("brickstock", JSON.stringify(stock)); LSset("bs_t", String(tStamp));
       render();
     } else if(j.t < tStamp) push();
@@ -1499,7 +1435,7 @@ function add(part, name, img, color) {
   const k = part + "|" + color;
   const it = stock.find(x => x.k == k);
   if(it) it.qty++;
-  else stock.push({ k, part, name, img, color, qty: 1, addedAt: Date.now() });
+  else stock.push({ k, part, name, img, color, qty: 1, addedAt: Date.now(), cv: 2 });
   save(); render();
   triggerHaptic();
   showToast("+1 " + (name || part) + " (" + colName(color) + ")");
@@ -1876,7 +1812,7 @@ function renderRes() {
     return;
   }
 
-  const QUICK_SWATCHES = [...new Set([...suggested, 0, 15, 4, 59, 1, 14, 2, 25, 71])].slice(0, 9);
+  const QUICK_SWATCHES = [...new Set([...suggested, 0, 15, 4, 320, 1, 14, 2, 25, 71])].slice(0, 9);
 
   const colLabel = curCol === 9999
     ? `<span class="cand-col warn">Couleur ?</span>`
@@ -1948,7 +1884,8 @@ async function rbPartImg(part, c) {   // image officielle Rebrickable pour CE co
   } catch(e) { return ""; }
 }
 
-// Chaîne : rendu LDraw → photo → API Rebrickable → image générique en gris (forme seule, pas de fausse couleur)
+const BL_COLOR = {0:11,15:1,71:86,72:85,4:5,1:7,14:3,2:6,25:4,70:88,19:2,28:69,272:63,320:59,288:80,27:34,10:36,322:156,321:153,73:42,484:68,191:110,226:103,1062:236,1050:220,5:47,77:56,26:71,351:94,22:24,85:89,30:157,31:154,323:152,212:105,379:55,378:48,326:155,3:39,92:28,78:90,1067:225,308:120,6:8,503:49,7:9,8:10,47:12,36:17,33:14,43:113,34:20,46:19,182:98,42:16,57:18,230:107,52:51,40:13};
+// Chaîne : rendu LDraw → photo → API Rebrickable → BrickLink → image générique en gris (forme seule, pas de fausse couleur)
 document.addEventListener("error", async e => {
   const t = e.target;
   if (t.tagName !== "IMG" || !t.dataset.part) return;
@@ -1958,8 +1895,10 @@ document.addEventListener("error", async e => {
     const u = await rbPartImg(part, c);
     if (u) { t.src = u; return; }
   }
-  if (t.dataset.fb && cur !== t.dataset.fb) {
-    t.classList.add("generic"); t.title = "Image indisponible dans cette couleur";
+  const bl = BL_COLOR[c];
+  if (bl && !t.dataset.bl) { t.dataset.bl = "1"; t.src = "https://img.bricklink.com/ItemImage/PN/" + bl + "/" + encodeURIComponent(part) + ".png"; return; }
+  if (t.dataset.fb && !t.dataset.gen) {
+    t.dataset.gen = "1"; t.classList.add("generic"); t.title = "Image indisponible dans cette couleur";
     t.src = t.dataset.fb;
   }
 }, true);
