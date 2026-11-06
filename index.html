@@ -757,7 +757,7 @@ video {
       <div class="viewfinder-overlay">
         <div class="color-target-spot" id="color-target-spot" title="Point d'analyse couleur (Touchez pour viser)"></div>
       </div>
-      <div class="vw-hint-text">Touchez l'écran pour viser la couleur · Pincez pour zoomer</div>
+      <div class="vw-hint-text">Touchez la pièce pour viser sa couleur · Pincez pour zoomer</div>
       <div class="scan-line"></div>
       <div class="cam-zoom-badge" id="zoom-badge">Zoom 1.0x</div>
     </div>
@@ -772,11 +772,16 @@ video {
 
     <div class="row" style="margin: 0; align-items: center; justify-content: space-between;">
       <label class="chk">
-        <input type="checkbox" id="autocol" checked> Couleur auto (Filtrage fond + Tap-target)
+        <input type="checkbox" id="autocol" checked> Couleur auto de la pièce
       </label>
       <label class="chk">
         <input type="checkbox" id="auto"> Auto (2,5s)
       </label>
+    </div>
+
+    <div class="row" style="margin:0">
+      <button class="btn sm" id="calib">⚪ Calibrer le blanc</button>
+      <button class="btn sm" id="calib-reset" style="flex:none" title="Réinitialiser le calibrage">↺</button>
     </div>
 
     <div id="status">Placez la pièce dans le cadrage et touchez "Scanner"</div>
@@ -1333,78 +1338,98 @@ vwBoxEl.addEventListener("click", e => {
   triggerHaptic();
 });
 
-function guessColor(canvas) {
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width, h = canvas.height;
+/* ===== MOTEUR COULEUR v2 : croissance de région depuis le point visé + balance des blancs ===== */
+let wb = [1, 1, 1];
+try { const s = JSON.parse(LS("bs_wb") || "null"); if (Array.isArray(s) && s.length === 3) wb = s; } catch(e) {}
+const wbActive = () => wb.some(g => Math.abs(g - 1) > 0.01);
+const PALETTE_CAM = PALETTE_LAB.filter(p => p.id !== 9999 && !/^Transp/i.test(p.name)); // une caméra ne distingue pas les translucides
+const med = a => { const s = Array.from(a).sort((x, y) => x - y); return s[s.length >> 1]; };
 
-  // Micro-ROI around targeted point (8% of width/height)
-  const sw = Math.max(14, Math.round(w * 0.08));
-  const sh = Math.max(14, Math.round(h * 0.08));
-  const sx = Math.round((w * sampleX) - (sw / 2));
-  const sy = Math.round((h * sampleY) - (sh / 2));
-
-  const imgData = ctx.getImageData(Math.max(0, sx), Math.max(0, sy), sw, sh).data;
-  const cx = sw / 2, cy = sh / 2;
-  const radiusSq = (cx * cx + cy * cy) || 1;
-
-  let samples = [];
-
-  for (let y = 0; y < sh; y++) {
-    for (let x = 0; x < sw; x++) {
-      const idx = (y * sw + x) * 4;
-      const r = imgData[idx], g = imgData[idx+1], b = imgData[idx+2];
-
-      const lab = rgbToLab(r, g, b);
-      const L = lab[0];
-
-      // Exclude specular highlights & deep shadows
-      if (L < 8 || L > 94) continue;
-
-      const max = Math.max(r, g, b), min = Math.min(r, g, b);
-      const sat = max === 0 ? 0 : (max - min) / max;
-
-      const dx = x - cx, dy = y - cy;
-      const distWeight = Math.exp(-4.0 * ((dx * dx + dy * dy) / radiusSq));
-
-      samples.push({ r, g, b, lab, sat, weight: distWeight });
-    }
-  }
-
-  if (!samples.length) return 9999;
-
-  // Filter background noise based on saturation
-  const avgSat = samples.reduce((acc, s) => acc + s.sat, 0) / samples.length;
-  if (avgSat > 0.18) {
-    samples = samples.filter(s => s.sat >= avgSat * 0.7);
-  }
-
-  if (!samples.length) return 9999;
-
-  // Weighted CIELAB average
-  let sumL = 0, sumA = 0, sumB = 0, totalW = 0;
-  for (const s of samples) {
-    sumL += s.lab[0] * s.weight;
-    sumA += s.lab[1] * s.weight;
-    sumB += s.lab[2] * s.weight;
-    totalW += s.weight;
-  }
-
-  const targetLab = [sumL / totalW, sumA / totalW, sumB / totalW];
-
-  let bestId = 9999;
-  let minDiff = 1e9;
-
-  for (const p of PALETTE_LAB) {
-    if (p.id === 9999) continue;
-    const diff = deltaE(targetLab, p.lab);
-    if (diff < minDiff) {
-      minDiff = diff;
-      bestId = p.id;
-    }
-  }
-
-  return bestId;
+// Distance : L pesé moins pour les couleurs vives (l'exposition varie), pleinement pour noir/blanc/gris
+function colDist(t, p) {
+  const wL = Math.hypot(t[1], t[2]) > 20 ? 0.5 : 1.0;
+  return Math.hypot(wL * (t[0] - p[0]), t[1] - p[1], t[2] - p[2]);
 }
+
+function analyseColor(canvas) {
+  const W = 96, H = Math.max(8, Math.round(canvas.height * W / canvas.width));
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const cx = c.getContext("2d", { willReadFrequently: true });
+  cx.drawImage(canvas, 0, 0, W, H);
+  const d = cx.getImageData(0, 0, W, H).data, N = W * H, lab = new Array(N);
+  for (let i = 0; i < N; i++) {
+    lab[i] = rgbToLab(Math.min(255, d[4*i] * wb[0]), Math.min(255, d[4*i+1] * wb[1]), Math.min(255, d[4*i+2] * wb[2]));
+  }
+  const px = Math.round(sampleX * (W - 1)), py = Math.round(sampleY * (H - 1));
+
+  // 1. Graine = médiane d'un petit patch autour du point visé
+  const patch = [];
+  for (let y = py - 2; y <= py + 2; y++) for (let x = px - 2; x <= px + 2; x++)
+    if (x >= 0 && y >= 0 && x < W && y < H) patch.push(lab[y * W + x]);
+  const seed = [0, 1, 2].map(k => med(patch.map(l => l[k])));
+
+  // 2. Croissance de région : on ne garde que les pixels connectés au point visé et de couleur proche
+  const near = l => Math.hypot(0.45 * (l[0] - seed[0]), l[1] - seed[1], l[2] - seed[2]) < 12;
+  const seen = new Uint8Array(N), region = [], stack = [py * W + px];
+  seen[stack[0]] = 1;
+  while (stack.length && region.length < N * 0.45) {
+    const i = stack.pop();
+    if (!near(lab[i])) continue;
+    region.push(i);
+    const x = i % W, y = (i / W) | 0;
+    for (const j of [x > 0 ? i-1 : -1, x < W-1 ? i+1 : -1, y > 0 ? i-W : -1, y < H-1 ? i+W : -1])
+      if (j >= 0 && !seen[j]) { seen[j] = 1; stack.push(j); }
+  }
+  let px_ = region.length >= 12 ? region.map(i => lab[i]) : patch;
+
+  // 3. Retire reflets (15 % les plus clairs) et ombres profondes (10 % les plus sombres), puis médiane
+  px_ = px_.slice().sort((a, b) => a[0] - b[0]);
+  const lo = Math.floor(px_.length * 0.10), hi = Math.ceil(px_.length * 0.85);
+  if (hi - lo >= 4) px_ = px_.slice(lo, hi);
+  const target = [0, 1, 2].map(k => med(px_.map(l => l[k])));
+
+  // 4. Fond estimé sur le cadre de l'image : si la "pièce" lui ressemble, on prévient
+  const border = [];
+  for (let x = 0; x < W; x++) { border.push(lab[x], lab[(H-1) * W + x]); }
+  for (let y = 0; y < H; y++) { border.push(lab[y * W], lab[y * W + W - 1]); }
+  const bg = [0, 1, 2].map(k => med(border.map(l => l[k])));
+  const bgClose = colDist(target, bg) < 7;
+
+  // 5. Top 3 des couleurs LEGO les plus proches
+  const top = PALETTE_CAM.map(p => ({ id: p.id, d: colDist(target, p.lab) })).sort((a, b) => a.d - b.d).slice(0, 3);
+  return { top, target, bgClose, size: region.length };
+}
+
+// Capture EXACTEMENT ce que l'utilisateur voit (recadrage object-fit:cover + zoom) :
+// les coordonnées du tap correspondent ainsi 1:1 aux pixels analysés.
+function captureFrame(maxW = 640) {
+  const bw = vwBoxEl.clientWidth, bh = vwBoxEl.clientHeight, vw = v.videoWidth, vh = v.videoHeight;
+  const s = Math.max(bw / vw, bh / vh), z = hwZoomActive ? 1 : zoom;
+  const sw = bw / s / z, sh = bh / s / z, k = Math.min(1, maxW / sw);
+  const c = document.createElement("canvas");
+  c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+  c.getContext("2d", { willReadFrequently: true }).drawImage(v, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, c.width, c.height);
+  return c;
+}
+
+// Calibrage : viser une feuille blanche / grise puis appuyer → corrige la dominante de l'éclairage
+function refreshCalib() { $("calib").textContent = wbActive() ? "⚪ Blanc calibré ✓" : "⚪ Calibrer le blanc"; }
+$("calib").onclick = () => {
+  if (!stream || !v.videoWidth) return showToast("Caméra non prête");
+  const c = captureFrame(320), r = 4;
+  const x = Math.round(sampleX * c.width), y = Math.round(sampleY * c.height);
+  const d = c.getContext("2d").getImageData(Math.max(0, x - r), Math.max(0, y - r), 2 * r, 2 * r).data;
+  let R = 0, G = 0, B = 0; const n = d.length / 4;
+  for (let i = 0; i < d.length; i += 4) { R += d[i]; G += d[i+1]; B += d[i+2]; }
+  R /= n; G /= n; B /= n;
+  const m = (R + G + B) / 3;
+  if (m < 60) return showToast("Zone trop sombre pour calibrer");
+  wb = [m / R, m / G, m / B].map(g => Math.min(2, Math.max(0.5, g)));
+  LSset("bs_wb", JSON.stringify(wb)); refreshCalib(); triggerHaptic();
+  showToast("Balance des blancs calibrée");
+};
+$("calib-reset").onclick = () => { wb = [1, 1, 1]; LSset("bs_wb", ""); refreshCalib(); showToast("Calibrage réinitialisé"); };
+refreshCalib();
 
 /* Category Helper for Filtering */
 function getPartCategory(partNum, name) {
@@ -1693,17 +1718,16 @@ const v = $("v"), st = t => $("status").textContent = t;
 let zoom = 1.0;
 let touchStartDist = 0, touchStartZoom = 1.0;
 
+let hwZoomActive = false;
 function setCameraZoom(z) {
   zoom = Math.min(3.5, Math.max(1.0, Math.round(z * 10) / 10));
-  v.style.transform = "scale(" + zoom + ")";
+  const track = stream && stream.getVideoTracks()[0];
+  const caps = track && track.getCapabilities ? track.getCapabilities() : null;
+  if (caps && caps.zoom) {   // zoom optique/matériel : pas de zoom CSS ni de recadrage en plus
+    hwZoomActive = true; v.style.transform = "none";
+    track.applyConstraints({ advanced: [{ zoom: Math.min(caps.zoom.max, Math.max(caps.zoom.min, zoom)) }] }).catch(() => {});
+  } else { hwZoomActive = false; v.style.transform = "scale(" + zoom + ")"; }
   $("zoom-badge").textContent = "Zoom " + zoom.toFixed(1) + "x";
-
-  if (stream) {
-    const track = stream.getVideoTracks()[0];
-    if (track && track.getCapabilities && track.getCapabilities().zoom) {
-      track.applyConstraints({ advanced: [{ zoom: zoom }] }).catch(() => {});
-    }
-  }
 }
 
 vwBoxEl.addEventListener("touchstart", e => {
@@ -1766,6 +1790,7 @@ function stopCam() {
     stream.getTracks().forEach(t => t.stop());
     stream = null; v.srcObject = null;
   }
+  zoom = 1; hwZoomActive = false; v.style.transform = ""; $("zoom-badge").textContent = "Zoom 1.0x";
   st("Caméra arrêtée.");
 }
 
@@ -1804,20 +1829,14 @@ async function scan() {
   st("Analyse en cours via Brickognize…");
 
   try {
-    const c = document.createElement("canvas");
-    const sw = v.videoWidth / zoom, sh = v.videoHeight / zoom;
-    const k = Math.min(1, 640 / sw);
-    c.width = sw * k; c.height = sh * k;
-    
-    c.getContext("2d").drawImage(v, (v.videoWidth - sw)/2, (v.videoHeight - sh)/2, sw, sh, 0, 0, c.width, c.height);
+    const c = captureFrame();
     const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
-
+    colorNote = "";
     if($("autocol").checked) {
-      const detected = guessColor(c);
-      if(detected && detected !== 9999) {
-        updateSelectedColor(detected);
-        st("Couleur décelée: " + colName(detected));
-      }
+      const res = analyseColor(c);
+      suggested = res.top.map(t => t.id);
+      updateSelectedColor(suggested[0]);
+      colorNote = colName(suggested[0]) + (res.bgClose ? " ⚠ proche du fond : posez la pièce sur une feuille blanche/grise" : "");
     }
 
     const fd = new FormData();
@@ -1836,7 +1855,7 @@ async function scan() {
   }
 }
 
-let cand = [];
+let cand = [], suggested = [], colorNote = "";
 function renderRes() {
   $("scan-count-tag").textContent = cand.length + " réponse" + (cand.length > 1 ? 's' : '');
   if(!cand.length) {
@@ -1844,7 +1863,7 @@ function renderRes() {
     return;
   }
 
-  const QUICK_SWATCHES = [0, 15, 4, 59, 1, 14, 2, 25, 71];
+  const QUICK_SWATCHES = [...new Set([...suggested, 0, 15, 4, 59, 1, 14, 2, 25, 71])].slice(0, 9);
 
   $("res").innerHTML = cand.map((x, i) => `<div class="cand-card">
     ${imgTag(x)}
@@ -1861,7 +1880,7 @@ function renderRes() {
 
 function show(items) {
   cand = items.map(it => ({ part: rbNum(it), name: it.name, img: it.img_url, score: it.score }));
-  st(cand.length ? "Sélectionnez la bonne pièce :" : "Aucune pièce reconnue. Essayez sous un autre angle.");
+  st((colorNote ? "Couleur : " + colorNote + " · " : "") + (cand.length ? "Choisissez la bonne pièce :" : "Aucune pièce reconnue. Essayez sous un autre angle."));
   renderRes();
 }
 
