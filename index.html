@@ -1417,22 +1417,44 @@ function getPartCategory(partNum, name) {
   return "other";
 }
 
-/* Tabs Switch */
+/* Tabs Switch with Instant Touch Response & Camera Stream Release */
 function tab(n) {
-  ["stock", "sets", "scan"].forEach(k => {
-    $("s-" + k).classList.toggle("on", k == n);
-    $("t-" + k).classList.toggle("on", k == n);
-  });
-  if(n == "scan") {
-    if(!stream) startCam();
-    else v.play().catch(()=>{});
-  } else {
-    clearInterval(timer); timer = null; $("auto").checked = false;
+  try {
+    // Close active modals on tab change if any were left open
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+
+    ["stock", "sets", "scan"].forEach(k => {
+      const sec = $("s-" + k);
+      const btn = $("t-" + k);
+      if(sec) sec.classList.toggle("on", k === n);
+      if(btn) btn.classList.toggle("on", k === n);
+    });
+
+    if (n === "scan") {
+      if (!stream) startCam();
+      else v.play().catch(() => {});
+    } else {
+      if (stream) stopCam();
+    }
+  } catch(err) {
+    console.error("Tab switch error:", err);
   }
 }
-$("t-stock").onclick = () => tab("stock");
-$("t-sets").onclick = () => tab("sets");
-$("t-scan").onclick = () => tab("scan");
+
+function bindTabBtn(id, targetTab) {
+  const btn = $(id);
+  if (!btn) return;
+  const handler = (e) => {
+    e.preventDefault();
+    tab(targetTab);
+  };
+  btn.addEventListener("pointerdown", handler);
+  btn.addEventListener("click", (e) => e.preventDefault());
+}
+
+bindTabBtn("t-stock", "stock");
+bindTabBtn("t-sets", "sets");
+bindTabBtn("t-scan", "scan");
 
 /* Stock Logic */
 function add(part, name, img, color) {
