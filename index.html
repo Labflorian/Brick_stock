@@ -1662,7 +1662,7 @@ function exportMissingSetPartsCSV() {
     const inStockQty = inStockItem ? inStockItem.qty : 0;
     const missingQty = p.quantity - inStockQty;
     if (missingQty > 0) {
-      missingRows.push(`"${partNum}",${colorId},${missingQty}`);
+      missingRows.push('"' + partNum + '",' + colorId + ',' + missingQty);
     }
   });
 
@@ -1670,13 +1670,10 @@ function exportMissingSetPartsCSV() {
     return alert("Félicitations ! Vous possédez déjà toutes les pièces pour ce set.");
   }
 
-  const csvContent = "Part,Color,Quantity
-" + missingRows.join("
-") + "
-";
+  const csvContent = "Part,Color,Quantity\n" + missingRows.join("\n") + "\n";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csvContent], { type: "text/csv" }));
-  a.download = `manquants-set-${currentSetNum}.csv`;
+  a.download = "manquants-set-" + currentSetNum + ".csv";
   document.body.appendChild(a); a.click(); a.remove();
   showToast("CSV pièces manquantes exporté !");
 }
@@ -1686,33 +1683,9 @@ $("q-set").onkeydown = e => { if(e.key === "Enter") searchSet(); };
 
 /* Rebrickable CSV Export */
 function csv() {
-  const q = s => /[",
-]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  return "Part,Color,Quantity
-" + stock.map(x => q(String(x.part)) + "," + x.color + "," + x.qty).join("
-") + "
-";
+  const q = s => /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  return "Part,Color,Quantity\n" + stock.map(x => q(String(x.part)) + "," + x.color + "," + x.qty).join("\n") + "\n";
 }
-
-$("exp").onclick = () => {
-  if(!stock.length) return alert("Le stock est vide.");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([csv().trim()], { type: "text/csv" }));
-  a.download = "rebrickable-stock.csv";
-  document.body.appendChild(a); a.click(); a.remove();
-  showToast("CSV exporté !");
-};
-
-$("cp").onclick = async () => {
-  if(!stock.length) return alert("Le stock est vide.");
-  const content = csv().trim();
-  try {
-    await navigator.clipboard.writeText(content);
-    showToast("CSV copié !");
-  } catch(e) {
-    prompt("Copiez le CSV :", content);
-  }
-};
 
 /* Camera & 2-Finger Pinch Zoom Control */
 let stream = null, timer = null, busy = false;
