@@ -1199,7 +1199,7 @@ function render() {
     if(sort === "qty-desc") return b.qty - a.qty;
     if(sort === "qty-asc") return a.qty - b.qty;
     if(sort === "name-asc") return (a.name || "").localeCompare(b.name || "");
-    if(sort === "part-asc") return String(a.part).localeCompare(String(a.part), undefined, {numeric: true});
+    if(sort === "part-asc") return String(a.part).localeCompare(String(b.part), undefined, {numeric: true});
     if(sort === "color-asc") return colName(a.color).localeCompare(colName(b.color));
     return (b.addedAt || 0) - (a.addedAt || 0);
   });
@@ -1385,10 +1385,7 @@ function exportMissingSetPartsCSV() {
     return alert("Félicitations ! Vous possédez déjà toutes les pièces pour ce set.");
   }
 
-  const csvContent = "Part,Color,Quantity
-" + missingRows.join("
-") + "
-";
+  const csvContent = "Part,Color,Quantity\n" + missingRows.join("\n") + "\n";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csvContent], { type: "text/csv" }));
   a.download = `manquants-set-${currentSetNum}.csv`;
@@ -1401,12 +1398,8 @@ $("q-set").onkeydown = e => { if(e.key === "Enter") searchSet(); };
 
 /* Rebrickable CSV Export */
 function csv() {
-  const q = s => /[",
-]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  return "Part,Color,Quantity
-" + stock.map(x => q(String(x.part)) + "," + x.color + "," + x.qty).join("
-") + "
-";
+  const q = s => /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  return "Part,Color,Quantity\n" + stock.map(x => q(String(x.part)) + "," + x.color + "," + x.qty).join("\n") + "\n";
 }
 
 $("exp").onclick = () => {
