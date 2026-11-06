@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>BrickStock — Gestionnaire, Scanner & Sets LEGO</title>
+<style>
+:root {
+  --bg: #0f1115;
+  --card-bg: #181a20;
+  --card-border: #262933;
+  --card-hover: #20232c;
+  --text-main: #f3f4f6;
+  --text-muted: #9ca3af;
+  --primary: #e3000b;
+  --primary-hover: #ff1a24;
+  --accent: #2563eb;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  color-scheme: dark;
+  box-sizing: border-box;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f3f4f6;
+    --card-bg: #ffffff;
+    --card-border: #e5e7eb;
+    --card-hover: #f9fafb;
+    --text-main: #111827;
+    --text-muted: #6b7280;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  touch-action: manipulation;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  max-width: 600px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+/* Header */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(15, 17, 21, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--card-border);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--primary);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 10px rgba(227, 0, 11, 0.4);
+}
+
+.brand-icon::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.sub { color: var(--text-muted); font-size: 12px; font-weight: 500; }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-main);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.icon-btn:active { transform: scale(0.95); }
+.icon-btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+/* Navigation bar */
+nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  background: rgba(24, 26, 32, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  max-width: 600px;
+  margin: 0 auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+nav button {
+  flex: 1;
+  padding: 10px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+nav button svg { width: 20px; height: 20px; fill: currentColor; }
+nav button.on { color: var(--primary); }
+
+/* Main sections */
+main { flex: 1; padding-bottom: 75px; overflow-y: auto; }
+section { display: none; padding: 12px; }
+section.on { display: block; }
+
+/* Buttons & Inputs */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-main);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  text-decoration: none;
+}
+
+.btn:active { transform: scale(0.97); }
+.btn.pri { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn.pri:hover { background: var(--primary-hover); }
+.btn.sm { padding: 5px 8px; font-size: 12px; border-radius: var(--radius-sm); }
+.btn.full { width: 100%; }
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.row > * { flex: 1; min-width: 0; }
+
+input, select {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus { border-color: var(--primary); }
+
+/* Stock Cards */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.card img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  padding: 4px;
+  flex: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.grow { flex: 1; min-width: 0; }
+.pn { font-weight: 700; font-size: 14px; color: var(--text-main); line-height: 1.2; }
+.name { font-size: 12px; color: var(--text-muted); margin-top: 2px; overflow-wrap: anywhere; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+.sw {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.25);
+  display: inline-block;
+  flex: none;
+}
+
+.qty { display: flex; align-items: center; gap: 4px; }
+.qty button {
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-main);
+  border-radius: var(--radius-sm);
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.qty b { min-width: 22px; text-align: center; font-size: 14px; }
+
+/* Set Cards */
+.set-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.set-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.set-header img {
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 4px;
+  flex: none;
+}
+
+.set-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.set-parts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  max-height: 350px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.set-part-item {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  font-size: 11px;
+  position: relative;
+}
+
+.set-part-item img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 4px;
+  padding: 2px;
+  margin-bottom: 4px;
+}
+
+.badge-status {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.badge-status.has { background: var(--success); color: #fff; }
+.badge-status.missing { background: var(--warning); color: #000; }
+
+/* Scan Viewport Layout */
+#s-scan {
+  padding: 10px 12px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  height: calc(100vh - 130px);
+}
+#s-scan.on { display: flex; }
+
+.vw-container {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--card-border);
+  flex: none;
+  touch-action: none;
+}
+
+video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.viewfinder-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.target-box {
+  width: 50%;
+  height: 50%;
+  border: 2px dashed rgba(255,255,255,0.75);
+  border-radius: 10px;
+  position: relative;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+}
+
+.target-box::before {
+  content: "Pincher pour zoomer la caméra";
+  position: absolute;
+  top: 6px;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 10px;
+  color: rgba(255,255,255,0.85);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.scan-line {
+  display: none;
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary);
+  animation: scanAnim 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes scanAnim {
+  0% { top: 10%; }
+  100% { top: 90%; }
+}
+
+.scanning .scan-line { display: block; }
+.scanning .target-box { border-color: var(--primary); }
+
+.cam-zoom-badge {
+  position: absolute;
+  bottom: 8px; right: 8px;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+/* Quick Scan Toolbar */
+.scan-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: none;
+}
+
+.color-badge-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Candidate Results List */
+.scan-results-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scan-results-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cand-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+}
+
+.cand-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cand-card img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 2px;
+  flex: none;
+}
+
+.quick-swatches {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.quick-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.3);
+  cursor: pointer;
+}
+.quick-swatch.active { outline: 2px solid var(--primary); }
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.modal-header h3 { font-size: 15px; font-weight: 700; }
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.color-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--card-border);
+  background: var(--bg);
+  color: var(--text-main);
+  border-radius: 20px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.color-chip.on {
+  border-color: var(--primary);
+  background: rgba(227, 0, 11, 0.15);
+  font-weight: 700;
+}
+
+.dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.25); flex: none; display: inline-block; }
+
+#toast {
+  position: fixed;
+  top: 55px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--success);
+  color: #fff;
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s ease;
+  z-index: 120;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.empty { text-align: center; padding: 20px 10px; color: var(--text-muted); font-size: 12px; }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+.chk input { width: auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-icon"></div>
+    <div>
+      <h1>BrickStock</h1>
+      <div class="sub" id="total">0 pièce · 0 référence</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" id="btn-sync-modal" title="Synchronisation GitHub Gist & Clé API">
+      <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div id="toast"></div>
+
+<!-- GIST SYNC & API SETTINGS MODAL -->
+<div class="modal-overlay" id="modal-sync">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>☁ Configuration & Synchro</h3>
+      <button class="icon-btn" onclick="document.getElementById('modal-sync').classList.remove('open')">✕</button>
+    </div>
+    
+    <div style="font-weight: 700; font-size: 13px; margin-bottom: 6px;">Clé API Rebrickable (pour les inventaires de Sets)</div>
+    <div style="display: flex; gap: 6px; margin-bottom: 14px;">
+      <input id="rb-key-input" type="password" placeholder="Clé Rebrickable (ex: 1234abcd...)">
+      <button class="btn pri sm" id="save-rb-key">Sauvegarder</button>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 12px 0;">
+
+    <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">Synchronisation GitHub Gist</div>
+    <div id="sst" class="sub" style="margin-bottom: 10px;">Non connecté</div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <input id="stok" type="password" placeholder="Jeton GitHub (droit 'gist')">
+      <button class="btn pri" id="screate">Créer une synchro Gist</button>
+      <input id="scode" placeholder="Code de synchro (id|token)">
+      <div class="row">
+        <button class="btn" id="sjoin">Rejoindre</button>
+        <button class="btn" id="scopy">Copier Code</button>
+        <button class="btn" id="soff">Déconnecter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COLOR SELECTOR MODAL SHEET -->
+<div class="modal-overlay" id="modal-color">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Choisir la couleur LEGO</h3>
+      <button class="icon-btn" onclick="document.getElementById('modal-color').classList.remove('open')">✕</button>
+    </div>
+    <div class="color-grid" id="color-grid-picker"></div>
+  </div>
+</div>
+
+<main>
+  <!-- STOCK TAB -->
+  <section id="s-stock" class="on">
+    <div class="row">
+      <input id="q" type="search" placeholder="Rechercher par nom ou référence…">
+    </div>
+    <div class="row">
+      <select id="f-cat">
+        <option value="">Toutes catégories</option>
+        <option value="brick">🧱 Briques</option>
+        <option value="plate">▔ Plaques & Tuiles</option>
+        <option value="slope">📐 Pentes & Angles</option>
+        <option value="technic">⚙ Technic & Engrenages</option>
+        <option value="minifig">👤 Minifigures & Armes</option>
+        <option value="other">🌀 Autres pièces</option>
+      </select>
+      <select id="f-color">
+        <option value="">Toutes couleurs</option>
+      </select>
+      <select id="s-sort">
+        <option value="recent">Tri: Récent</option>
+        <option value="qty-desc">Tri: Quantité (↓)</option>
+        <option value="qty-asc">Tri: Quantité (↑)</option>
+        <option value="name-asc">Tri: Nom (A-Z)</option>
+        <option value="part-asc">Tri: N° Pièce</option>
+        <option value="color-asc">Tri: Couleur</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <button class="btn pri" id="exp">Exporter CSV (Rebrickable)</button>
+      <button class="btn" id="cp">Copier CSV</button>
+    </div>
+
+    <div id="list"></div>
+  </section>
+
+  <!-- SETS TAB -->
+  <section id="s-sets">
+    <div class="row">
+      <input id="q-set" type="search" placeholder="N° de set (ex: 75301, 71799, 75192)…">
+      <button class="btn pri" id="btn-search-set" style="flex: none;">Rechercher</button>
+    </div>
+
+    <div id="set-status" class="sub" style="margin-bottom: 10px; text-align: center;">Entrez un numéro de set LEGO pour afficher la notice et la liste des pièces.</div>
+
+    <div id="set-results"></div>
+  </section>
+
+  <!-- SCAN TAB -->
+  <section id="s-scan">
+    <div class="vw-container" id="vw-box">
+      <video id="v" playsinline muted autoplay></video>
+      <div class="viewfinder-overlay">
+        <div class="target-box">
+          <div class="scan-line"></div>
+        </div>
+      </div>
+      <div class="cam-zoom-badge" id="zoom-badge">Zoom 1.0x</div>
+    </div>
+
+    <div class="scan-toolbar">
+      <button class="btn pri full" id="snap" style="font-size: 15px; padding: 10px;">📷 Scanner la pièce</button>
+      <div class="color-badge-btn" id="open-color-picker">
+        <span class="sw" id="scan-col-sw" style="background:#CCCCCC"></span>
+        <span id="scan-col-label">Toute couleur</span> ▾
+      </div>
+    </div>
+
+    <div class="row" style="margin: 0; align-items: center; justify-content: space-between;">
+      <label class="chk">
+        <input type="checkbox" id="autocol" checked> Couleur auto (HSL + Balance)
+      </label>
+      <label class="chk">
+        <input type="checkbox" id="auto"> Auto (2,5s)
+      </label>
+    </div>
+
+    <div id="status">Placez la pièce dans le cadrage et touchez "Scanner"</div>
+
+    <div class="scan-results-container">
+      <div class="scan-results-title">
+        <span>Pièces identifiées</span>
+        <span class="sub" id="scan-count-tag">0 réponse</span>
+      </div>
+      <div class="cand-grid" id="res"></div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button id="t-stock" class="on">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+    Stock
+  </button>
+  <button id="t-sets">
+    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+    Sets
+  </button>
+  <button id="t-scan">
+    <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+    Scanner
+  </button>
+</nav>
+
+<script>
+/* Block Browser Webpage Pinch-to-Zoom */
+document.addEventListener('touchmove', function(e) {
+  if (e.touches.length > 1) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
+document.addEventListener('gestureend', function(e) { e.preventDefault(); });
+
+const COLORS = [
+  [9999, "Toute couleur", "CCCCCC"],
+  [0, "Noir", "05131D"],
+  [15, "Blanc", "FFFFFF"],
+  [4, "Rouge", "C91A09"],
+  [1, "Bleu", "0055BF"],
+  [14, "Jaune", "F2CD37"],
+  [2, "Vert", "237841"],
+  [25, "Orange", "FE8A18"],
+  [5, "Rose foncé", "C870A0"],
+  [26, "Magenta", "901F76"],
+  [272, "Bleu foncé", "0A3463"],
+  [73, "Bleu moyen", "5A93DB"],
+  [11, "Turquoise", "008F9B"],
+  [322, "Azur moyen", "36AEBF"],
+  [288, "Vert foncé", "184632"],
+  [10, "Vert vif", "4B9F4A"],
+  [226, "Jaune clair vif", "FFF03A"],
+  [78, "Chair claire", "F6D7B3"],
+  [92, "Chair", "CC702A"],
+  [19, "Beige", "E4CD9E"],
+  [28, "Beige foncé", "958A73"],
+  [6, "Marron", "582A12"],
+  [70, "Marron rougeâtre", "582A12"],
+  [308, "Marron foncé", "352100"],
+  [484, "Orange foncé", "A95500"],
+  [71, "Gris bleuté clair", "A0A5A9"],
+  [72, "Gris bleuté foncé", "6C6E68"],
+  [503, "Gris très clair", "E6E3DA"],
+  [378, "Vert sable", "A0BCAC"],
+  [379, "Bleu sable", "6074A1"],
+  [47, "Transparent", "FCFCFC"],
+  [36, "Transp. rouge", "C91A09"],
+  [34, "Transp. vert", "237841"],
+  [43, "Transp. bleu clair", "AEEFEC"],
+  [33, "Transp. bleu", "0020A0"],
+  [46, "Transp. jaune", "F5CD2A"],
+  [182, "Transp. orange", "F08F1C"]
+];
+
+const colName = id => (COLORS.find(c => c[0] == id) || [0, "Couleur " + id])[1];
+const colRgb = id => "#" + ((COLORS.find(c => c[0] == id) || [0,0,"CCCCCC"])[2]);
+const $ = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let stock = [];
+try {
+  const saved = localStorage.getItem("brickstock");
+  if (saved) {
+    stock = JSON.parse(saved);
+  }
+} catch(e) {
+  console.error("Failed to load stock from localStorage:", e);
+}
+
+const LS = k => { try { return localStorage.getItem(k) || ""; } catch(e){ return ""; } };
+const LSset = (k, v) => { try { localStorage.setItem(k, v); } catch(e){} };
+
+let tStamp = +LS("bs_t") || 0, gid = LS("bs_gid"), gtok = LS("bs_tok"), pt = null;
+let rbKey = LS("bs_rbkey") || "";
+
+$("rb-key-input").value = rbKey;
+$("save-rb-key").onclick = () => {
+  rbKey = $("rb-key-input").value.trim();
+  LSset("bs_rbkey", rbKey);
+  showToast("Clé Rebrickable enregistrée !");
+};
+
+function showToast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2000);
+}
+
+const save = () => {
+  tStamp = Date.now();
+  LSset("brickstock", JSON.stringify(stock));
+  LSset("bs_t", String(tStamp));
+  push();
+};
+
+const sst = t => { $("sst").textContent = t; };
+const gh = (path, o={}) => fetch("https://api.github.com" + path, {
+  ...o,
+  headers: { Accept: "application/vnd.github+json", Authorization: "Bearer " + gtok, "Content-Type": "application/json" }
+});
+
+const payload = () => JSON.stringify({ t: tStamp, stock });
+const showCode = () => { $("scode").value = gid + "|" + gtok; };
+
+async function createGist() {
+  gtok = $("stok").value.trim();
+  if(!gtok) return sst("· Collez d'abord le jeton");
+  if(!tStamp) { tStamp = Date.now(); LSset("bs_t", String(tStamp)); }
+  try {
+    const r = await gh("/gists", { method: "POST", body: JSON.stringify({ description: "Brick Stock Data", public: false, files: { "stock.json": { content: payload() } } }) });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    gid = (await r.json()).id;
+    LSset("bs_gid", gid); LSset("bs_tok", gtok);
+    $("stok").value = ""; showCode(); sst("· Synchro active ✓");
+    showToast("Synchro Gist créée !");
+  } catch(e) { gtok = ""; sst("· Échec: " + e.message); }
+}
+
+async function pull() {
+  if(!gid) return;
+  try {
+    const r = await gh("/gists/" + gid);
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const f = (await r.json()).files["stock.json"];
+    const j = JSON.parse(f.truncated ? await (await fetch(f.raw_url)).text() : f.content);
+    if(j.t > tStamp) {
+      stock = j.stock; tStamp = j.t;
+      LSset("brickstock", JSON.stringify(stock)); LSset("bs_t", String(tStamp));
+      render();
+    } else if(j.t < tStamp) push();
+    sst("· À jour ✓");
+  } catch(e) { sst("· Err synchro: " + e.message); }
+}
+
+function push() {
+  if(!gid) return;
+  clearTimeout(pt);
+  pt = setTimeout(async () => {
+    try {
+      const r = await gh("/gists/" + gid, { method: "PATCH", body: JSON.stringify({ files: { "stock.json": { content: payload() } } }) });
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      sst("· À jour ✓");
+    } catch(e) { sst("· Envoi impossible"); }
+  }, 1500);
+}
+
+async function joinGist() {
+  const parts = $("scode").value.trim().split("|");
+  const i = parts[0], t = parts[1];
+  if(!i || !t) return sst("· Code invalide (id|token)");
+  if(stock.length && !confirm("Remplacer le stock de cet appareil par celui de la synchro ?")) return;
+  gid = i; gtok = t;
+  LSset("bs_gid", gid); LSset("bs_tok", gtok);
+  tStamp = 0; await pull();
+  showToast("Connecté à la synchro !");
+}
+
+$("btn-sync-modal").onclick = () => $("modal-sync").classList.add("open");
+$("screate").onclick = createGist;
+$("sjoin").onclick = joinGist;
+$("scopy").onclick = async () => {
+  try { await navigator.clipboard.writeText($("scode").value); sst("· Code copié ✓"); showToast("Code copié !"); }
+  catch(e) { sst("· Copiez le code manuellement"); }
+};
+$("soff").onclick = () => { gid = gtok = ""; LSset("bs_gid", ""); LSset("bs_tok", ""); $("scode").value = ""; sst("· Désactivée"); };
+
+/* Color Picker UI */
+let curCol = 9999;
+function updateSelectedColor(colId) {
+  curCol = colId;
+  $("scan-col-sw").style.background = colRgb(curCol);
+  $("scan-col-label").textContent = colName(curCol);
+  renderRes();
+}
+
+function buildColorPickerGrid() {
+  const grid = $("color-grid-picker");
+  grid.innerHTML = COLORS.map(c => `<div class="color-chip ${c[0]==curCol?'on':''}" data-c="${c[0]}">
+    <span class="dot" style="background:#${c[2]}"></span>
+    <span>${esc(c[1])}</span>
+  </div>`).join("");
+}
+
+$("open-color-picker").onclick = () => {
+  buildColorPickerGrid();
+  $("modal-color").classList.add("open");
+};
+
+$("color-grid-picker").onclick = e => {
+  const chip = e.target.closest(".color-chip");
+  if(!chip) return;
+  const cId = +chip.dataset.c;
+  updateSelectedColor(cId);
+  $("modal-color").classList.remove("open");
+};
+
+// Populate filter dropdown in stock tab
+const fColSelect = $("f-color");
+COLORS.forEach(c => {
+  if(c[0] !== 9999) {
+    const opt = document.createElement("option");
+    opt.value = c[0];
+    opt.textContent = c[1];
+    fColSelect.appendChild(opt);
+  }
+});
+
+/* ADVANCED COLOR RECOGNITION ENGINE (CIE L*a*b* + DOMINANT CLUSTER QUANTIZATION + CENTER GAUSSIAN WEIGHTING) */
+function hex2rgb(h) { return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+
+function rgbToLab(r, g, b) {
+  let nr = r / 255, ng = g / 255, nb = b / 255;
+  nr = nr > 0.04045 ? Math.pow((nr + 0.055) / 1.055, 2.4) : nr / 12.92;
+  ng = ng > 0.04045 ? Math.pow((ng + 0.055) / 1.055, 2.4) : ng / 12.92;
+  nb = nb > 0.04045 ? Math.pow((nb + 0.055) / 1.055, 2.4) : nb / 12.92;
+
+  let x = (nr * 0.4124 + ng * 0.3576 + nb * 0.1805) / 0.95047;
+  let y = (nr * 0.2126 + ng * 0.7152 + nb * 0.0722) / 1.00000;
+  let z = (nr * 0.0193 + ng * 0.1192 + nb * 0.9505) / 1.08883;
+
+  x = x > 0.008856 ? Math.cbrt(x) : (7.787 * x) + (16 / 116);
+  y = y > 0.008856 ? Math.cbrt(y) : (7.787 * y) + (16 / 116);
+  z = z > 0.008856 ? Math.cbrt(z) : (7.787 * z) + (16 / 116);
+
+  return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
+}
+
+function deltaE(lab1, lab2) {
+  const dl = lab1[0] - lab2[0];
+  const da = lab1[1] - lab2[1];
+  const db = lab1[2] - lab2[2];
+  return Math.sqrt(dl * dl + da * da + db * db);
+}
+
+// Pre-calculate CIELAB vectors for official LEGO palette
+const PALETTE_LAB = COLORS.map(c => {
+  if (c[0] === 9999) return { id: c[0], name: c[1], hex: c[2], lab: [100, 0, 0] };
+  const rgb = hex2rgb(c[2]);
+  return { id: c[0], name: c[1], hex: c[2], rgb, lab: rgbToLab(rgb[0], rgb[1], rgb[2]) };
+});
+
+function guessColor(canvas) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+
+  // Sample center 40% x 40% region with radial Gaussian weighting
+  const sx = Math.round(w * 0.30), sy = Math.round(h * 0.30);
+  const sw = Math.round(w * 0.40), sh = Math.round(h * 0.40);
+  const imgData = ctx.getImageData(sx, sy, sw, sh).data;
+
+  const cx = sw / 2, cy = sh / 2;
+  const maxDistSq = (cx * cx + cy * cy) || 1;
+
+  // Step 1: Color Quantization into 8x8x8 RGB Bins to find Dominant Cluster (Mode)
+  const binWeights = new Map();
+  const binPixels = new Map();
+
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      const idx = (y * sw + x) * 4;
+      const r = imgData[idx], g = imgData[idx+1], b = imgData[idx+2];
+
+      // Radial center weight (center pixels carry up to 3x weight)
+      const dx = x - cx, dy = y - cy;
+      const distWeight = 1.0 + 2.0 * (1.0 - (dx * dx + dy * dy) / maxDistSq);
+
+      const lab = rgbToLab(r, g, b);
+      const L = lab[0];
+
+      // Exclude extreme specular glare (L* > 94) and deep dark shadows (L* < 6)
+      if (L < 6 || L > 94) continue;
+
+      // Quantize to 8x8x8 color space (32 steps per RGB channel)
+      const qr = Math.floor(r / 32), qg = Math.floor(g / 32), qb = Math.floor(b / 32);
+      const binKey = (qr << 6) | (qg << 3) | qb;
+
+      binWeights.set(binKey, (binWeights.get(binKey) || 0) + distWeight);
+      if (!binPixels.has(binKey)) binPixels.set(binKey, []);
+      binPixels.get(binKey).push([r, g, b, distWeight]);
+    }
+  }
+
+  if (binWeights.size === 0) return 9999;
+
+  // Step 2: Extract Dominant Color Cluster
+  let maxWeight = 0, dominantBin = -1;
+  for (const [binKey, weight] of binWeights.entries()) {
+    if (weight > maxWeight) {
+      maxWeight = weight;
+      dominantBin = binKey;
+    }
+  }
+
+  if (dominantBin === -1) return 9999;
+
+  // Step 3: Compute Center-Weighted Average RGB of Dominant Cluster
+  const cluster = binPixels.get(dominantBin);
+  let sumR = 0, sumG = 0, sumB = 0, totalW = 0;
+  for (const [r, g, b, w] of cluster) {
+    sumR += r * w;
+    sumG += g * w;
+    sumB += b * w;
+    totalW += w;
+  }
+
+  const avgR = sumR / totalW;
+  const avgG = sumG / totalW;
+  const avgB = sumB / totalW;
+
+  const sampleLab = rgbToLab(avgR, avgG, avgB);
+
+  // Step 4: Perceptual Match in CIELAB Space using Delta E Distance
+  let bestId = 9999;
+  let minDiff = 1e9;
+
+  for (const p of PALETTE_LAB) {
+    if (p.id === 9999) continue;
+    const diff = deltaE(sampleLab, p.lab);
+    if (diff < minDiff) {
+      minDiff = diff;
+      bestId = p.id;
+    }
+  }
+
+  return bestId;
+}
+
+/* Category Helper for Filtering */
+function getPartCategory(partNum, name) {
+  const n = (name || "").toLowerCase();
+  if(n.includes("brick") || n.includes("brique")) return "brick";
+  if(n.includes("plate") || n.includes("tile") || n.includes("plaque") || n.includes("tuile")) return "plate";
+  if(n.includes("slope") || n.includes("wedge") || n.includes("pente") || n.includes("angle")) return "slope";
+  if(n.includes("technic") || n.includes("pin") || n.includes("axle") || n.includes("gear") || n.includes("beam")) return "technic";
+  if(n.includes("minifig") || n.includes("torso") || n.includes("head") || n.includes("legs") || n.includes("hair") || n.includes("weapon")) return "minifig";
+  return "other";
+}
+
+/* Tabs Switch */
+function tab(n) {
+  ["stock", "sets", "scan"].forEach(k => {
+    $("s-" + k).classList.toggle("on", k == n);
+    $("t-" + k).classList.toggle("on", k == n);
+  });
+  if(n == "scan") {
+    if(!stream) startCam();
+    else v.play().catch(()=>{});
+  } else {
+    clearInterval(timer); timer = null; $("auto").checked = false;
+  }
+}
+$("t-stock").onclick = () => tab("stock");
+$("t-sets").onclick = () => tab("sets");
+$("t-scan").onclick = () => tab("scan");
+
+/* Stock Logic */
+function add(part, name, img, color) {
+  const k = part + "|" + color;
+  const it = stock.find(x => x.k == k);
+  if(it) it.qty++;
+  else stock.push({ k, part, name, img, color, qty: 1, addedAt: Date.now() });
+  save(); render();
+  showToast("+1 " + (name || part) + " (" + colName(color) + ")");
+}
+
+function render() {
+  const f = $("q").value.trim().toLowerCase();
+  const fc = $("f-color").value;
+  const fcat = $("f-cat").value;
+  const sort = $("s-sort").value;
+
+  let rows = stock.filter(x => {
+    const matchesQuery = !f || (x.part + " " + x.name).toLowerCase().includes(f);
+    const matchesColor = !fc || x.color == fc;
+    const matchesCat = !fcat || getPartCategory(x.part, x.name) == fcat;
+    return matchesQuery && matchesColor && matchesCat;
+  });
+
+  rows.sort((a, b) => {
+    if(sort === "qty-desc") return b.qty - a.qty;
+    if(sort === "qty-asc") return a.qty - b.qty;
+    if(sort === "name-asc") return (a.name || "").localeCompare(b.name || "");
+    if(sort === "part-asc") return String(a.part).localeCompare(String(b.part), undefined, {numeric: true});
+    if(sort === "color-asc") return colName(a.color).localeCompare(colName(b.color));
+    return (b.addedAt || 0) - (a.addedAt || 0);
+  });
+
+  const n = stock.reduce((a,x) => a + x.qty, 0);
+  $("total").textContent = `${n} pièce${n>1?"s":""} · ${stock.length} réf.`;
+
+  if(!rows.length) {
+    $("list").innerHTML = `<div class="empty">Aucun élément dans le stock pour ces filtres.<br>Passez par l'onglet Scanner pour ajouter des pièces.</div>`;
+    return;
+  }
+
+  $("list").innerHTML = rows.map(x => `<div class="card">
+    ${imgTag(x)}
+    <div class="grow">
+      <div class="pn">${esc(x.part)}</div>
+      <div class="name">${esc(x.name)}</div>
+      <div class="meta">
+        <span class="sw" style="background:${colRgb(x.color)}"></span>${esc(colName(x.color))}
+      </div>
+    </div>
+    <div class="qty">
+      <button data-k="${esc(x.k)}" data-d="-1">−</button>
+      <b>${x.qty}</b>
+      <button data-k="${esc(x.k)}" data-d="1">+</button>
+    </div>
+  </div>`).join("");
+}
+
+$("list").onclick = e => {
+  const b = e.target.closest("button[data-k]"); if(!b) return;
+  const it = stock.find(x => x.k == b.dataset.k); if(!it) return;
+  it.qty += +b.dataset.d;
+  if(it.qty <= 0) stock = stock.filter(x => x !== it);
+  save(); render();
+};
+
+$("q").oninput = render;
+$("f-color").onchange = render;
+$("f-cat").onchange = render;
+$("s-sort").onchange = render;
+
+/* SETS TAB LOGIC */
+async function searchSet() {
+  const rawNum = $("q-set").value.trim();
+  if(!rawNum) return;
+  const setNum = rawNum.includes("-") ? rawNum : rawNum + "-1";
+  const cleanNum = setNum.split("-")[0];
+
+  const statusEl = $("set-status");
+  const resEl = $("set-results");
+  statusEl.textContent = "Recherche des informations du set " + setNum + "…";
+  resEl.innerHTML = "";
+
+  const instructionsUrl = "https://www.lego.com/fr-fr/service/buildinginstructions/" + cleanNum;
+  const rebrickableUrl = "https://rebrickable.com/sets/" + setNum;
+
+  let setData = {
+    set_num: setNum,
+    name: "Set LEGO " + cleanNum,
+    set_img_url: "https://cdn.rebrickable.com/media/sets/" + setNum.toLowerCase() + ".jpg",
+    num_parts: "Non spécifié"
+  };
+
+  if(rbKey) {
+    try {
+      const r = await fetch("https://rebrickable.com/api/v3/lego/sets/" + setNum + "/?key=" + rbKey);
+      if(r.ok) {
+        const j = await r.json();
+        setData = j;
+      }
+    } catch(e){}
+  }
+
+  statusEl.textContent = "Résultat trouvé pour le set " + setNum;
+
+  resEl.innerHTML = `<div class="set-card">
+    <div class="set-header">
+      <img src="${esc(setData.set_img_url)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt="">
+      <div class="grow">
+        <div class="pn">${esc(setData.name)}</div>
+        <div class="sub">Set N° ${esc(setData.set_num)} ${setData.year ? "· "+setData.year : ""}</div>
+        <div class="meta">${setData.num_parts} pièces</div>
+      </div>
+    </div>
+    <div class="set-actions">
+      <a href="${instructionsUrl}" target="_blank" rel="noopener" class="btn pri sm full">📄 Notice PDF (LEGO.com)</a>
+      <a href="${rebrickableUrl}" target="_blank" rel="noopener" class="btn sm full">🌐 Page Rebrickable</a>
+    </div>
+    <button class="btn sm full" id="btn-load-parts" style="margin-top:4px;">📦 Charger & comparer l'inventaire des pièces</button>
+    <div id="set-parts-container"></div>
+  </div>`;
+
+  $("btn-load-parts").onclick = () => fetchSetParts(setNum);
+}
+
+async function fetchSetParts(setNum) {
+  const container = $("set-parts-container");
+  if(!rbKey) {
+    container.innerHTML = `<div class="empty" style="margin-top:10px;">
+      Pour charger la liste interactive des pièces et comparer avec votre stock, ajoutez votre <b>clé API Rebrickable gratuite</b> dans le menu ☁ Configuration (en haut à droite).<br><br>
+      <a href="https://rebrickable.com/api/" target="_blank" rel="noopener" class="btn pri sm">Obtenir une clé Rebrickable gratuite</a>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = `<div class="empty" style="margin-top:10px;">Chargement de l'inventaire du set…</div>`;
+
+  try {
+    const r = await fetch("https://rebrickable.com/api/v3/lego/sets/" + setNum + "/parts/?page_size=1000&key=" + rbKey);
+    if(!r.ok) throw new Error("Erreur HTTP " + r.status);
+    const data = await r.json();
+    const parts = data.results || [];
+
+    if(!parts.length) {
+      container.innerHTML = `<div class="empty">Aucune pièce trouvée pour ce set.</div>`;
+      return;
+    }
+
+    let matchCount = 0;
+    const partsHtml = parts.map(p => {
+      const partNum = p.part.part_num;
+      const colorId = p.color.id;
+      const key = partNum + "|" + colorId;
+      const inStockItem = stock.find(x => x.k === key);
+      const inStockQty = inStockItem ? inStockItem.qty : 0;
+      const neededQty = p.quantity;
+      const hasEnough = inStockQty >= neededQty;
+      if(inStockQty > 0) matchCount++;
+
+      return `<div class="set-part-item">
+        <span class="badge-status ${hasEnough ? 'has' : (inStockQty > 0 ? 'missing' : '')}">${inStockQty}/${neededQty}</span>
+        <img src="${esc(p.part.part_img_url || 'https://cdn.rebrickable.com/media/parts/ldraw/' + colorId + '/' + partNum + '.png')}" onerror="this.src='https://cdn.rebrickable.com/media/parts/photos/0/no_image.jpg'" alt="">
+        <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(partNum)}</div>
+        <div style="color:var(--text-muted); font-size:10px; margin-top:2px;">${esc(p.color.name)}</div>
+      </div>`;
+    }).join("");
+
+    container.innerHTML = `<div style="margin-top:12px; font-size:12px; font-weight:700; display:flex; justify-content:space-between;">
+      <span>Pièces trouvées dans votre stock :</span>
+      <span style="color:var(--primary);">${matchCount} / ${parts.length} réfs</span>
+    </div>
+    <div class="set-parts-grid">${partsHtml}</div>`;
+
+  } catch(e) {
+    container.innerHTML = `<div class="empty" style="color:var(--primary);">Erreur lors du chargement : ${esc(e.message)}</div>`;
+  }
+}
+
+$("btn-search-set").onclick = searchSet;
+$("q-set").onkeydown = e => { if(e.key === "Enter") searchSet(); };
+
+/* Rebrickable CSV Export */
+function csv() {
+  const q = s => /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  return "Part,Color,Quantity\n" + stock.map(x => q(String(x.part)) + "," + x.color + "," + x.qty).join("\n") + "\n";
+}
+
+$("exp").onclick = () => {
+  if(!stock.length) return alert("Le stock est vide.");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv().trim()], { type: "text/csv" }));
+  a.download = "rebrickable-stock.csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast("CSV exporté !");
+};
+
+$("cp").onclick = async () => {
+  if(!stock.length) return alert("Le stock est vide.");
+  const content = csv().trim();
+  try {
+    await navigator.clipboard.writeText(content);
+    showToast("CSV copié !");
+  } catch(e) {
+    prompt("Copiez le CSV :", content);
+  }
+};
+
+/* Camera & 2-Finger Pinch Zoom Control */
+let stream = null, timer = null, busy = false;
+const v = $("v"), st = t => $("status").textContent = t;
+let zoom = 1.0;
+let touchStartDist = 0, touchStartZoom = 1.0;
+
+function setCameraZoom(z) {
+  zoom = Math.min(3.5, Math.max(1.0, Math.round(z * 10) / 10));
+  v.style.transform = "scale(" + zoom + ")";
+  $("zoom-badge").textContent = "Zoom " + zoom.toFixed(1) + "x";
+
+  if (stream) {
+    const track = stream.getVideoTracks()[0];
+    if (track && track.getCapabilities && track.getCapabilities().zoom) {
+      track.applyConstraints({ advanced: [{ zoom: zoom }] }).catch(() => {});
+    }
+  }
+}
+
+const vwBox = $("vw-box");
+
+vwBox.addEventListener("touchstart", e => {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    touchStartDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    touchStartZoom = zoom;
+  }
+}, { passive: false });
+
+vwBox.addEventListener("touchmove", e => {
+  if (e.touches.length === 2 && touchStartDist > 0) {
+    e.preventDefault();
+    const currDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    const factor = currDist / touchStartDist;
+    setCameraZoom(touchStartZoom * factor);
+  }
+}, { passive: false });
+
+vwBox.addEventListener("touchend", e => {
+  if (e.touches.length < 2) {
+    touchStartDist = 0;
+  }
+});
+
+async function startCam() {
+  st("Initialisation caméra…");
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false
+    });
+    v.srcObject = stream;
+    await v.play();
+    st("Caméra prête. Pincez l'écran pour zoomer.");
+    return true;
+  } catch(e) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      v.srcObject = stream;
+      await v.play();
+      st("Caméra prête.");
+      return true;
+    } catch(err) {
+      st("Erreur caméra: " + err.message);
+      return false;
+    }
+  }
+}
+
+function stopCam() {
+  clearInterval(timer); timer = null; $("auto").checked = false;
+  if(stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null; v.srcObject = null;
+  }
+  st("Caméra arrêtée.");
+}
+
+$("auto").onchange = e => {
+  clearInterval(timer);
+  if(e.target.checked) {
+    if(!stream) {
+      startCam().then(ok => {
+        if(ok) timer = setInterval(scan, 2500);
+        else e.target.checked = false;
+      });
+    } else {
+      timer = setInterval(scan, 2500);
+    }
+  }
+};
+
+$("snap").onclick = scan;
+
+const rbNum = it => {
+  const s = (it.external_sites || []).find(x => /rebrickable\.com\/parts\//.test(x.url || ""));
+  const m = s && s.url.match(/parts\/([^\/?#]+)/);
+  return m ? m[1] : it.id;
+};
+
+async function scan() {
+  if(busy) return;
+  if(!stream || !v.videoWidth) {
+    const started = await startCam();
+    if(!started) return;
+    await new Promise(r => setTimeout(r, 600));
+  }
+
+  busy = true;
+  $("vw-box").classList.add("scanning");
+  st("Analyse en cours via Brickognize…");
+
+  try {
+    const c = document.createElement("canvas");
+    const sw = v.videoWidth / zoom, sh = v.videoHeight / zoom;
+    const k = Math.min(1, 640 / sw);
+    c.width = sw * k; c.height = sh * k;
+    
+    c.getContext("2d").drawImage(v, (v.videoWidth - sw)/2, (v.videoHeight - sh)/2, sw, sh, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+
+    if($("autocol").checked) {
+      const detected = guessColor(c);
+      if(detected && detected !== 9999) {
+        updateSelectedColor(detected);
+        st("Couleur décelée: " + colName(detected));
+      }
+    }
+
+    const fd = new FormData();
+    fd.append("query_image", blob, "frame.jpg");
+
+    const r = await fetch("https://api.brickognize.com/predict/parts/", { method: "POST", body: fd });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+
+    show((d.items || []).slice(0, 4));
+  } catch(e) {
+    st("Erreur lors de l'analyse: " + e.message);
+  } finally {
+    busy = false;
+    $("vw-box").classList.remove("scanning");
+  }
+}
+
+let cand = [];
+function renderRes() {
+  $("scan-count-tag").textContent = cand.length + " réponse" + (cand.length > 1 ? 's' : '');
+  if(!cand.length) {
+    $("res").innerHTML = `<div class="empty" style="padding:15px;">Appuyez sur "Scanner la pièce" pour lancer la détection</div>`;
+    return;
+  }
+
+  const QUICK_SWATCHES = [0, 15, 4, 1, 14, 2, 25, 71];
+
+  $("res").innerHTML = cand.map((x, i) => `<div class="cand-card">
+    ${imgTag(x)}
+    <div class="grow">
+      <div class="pn">${esc(x.part)}</div>
+      <div class="name">${esc(x.name)}</div>
+      <div class="quick-swatches">
+        ${QUICK_SWATCHES.map(cId => `<span class="quick-swatch ${cId==curCol?'active':''}" style="background:${colRgb(cId)}" title="${esc(colName(cId))}" data-item="${i}" data-cid="${cId}"></span>`).join("")}
+      </div>
+    </div>
+    <button class="btn pri sm" data-i="${i}">+ Ajouter</button>
+  </div>`).join("");
+}
+
+function show(items) {
+  cand = items.map(it => ({ part: rbNum(it), name: it.name, img: it.img_url, score: it.score }));
+  st(cand.length ? "Sélectionnez la bonne pièce :" : "Aucune pièce reconnue. Essayez sous un autre angle.");
+  renderRes();
+}
+
+$("res").onclick = e => {
+  const swatch = e.target.closest(".quick-swatch");
+  if (swatch) {
+    const cId = +swatch.dataset.cid;
+    updateSelectedColor(cId);
+    return;
+  }
+
+  const b = e.target.closest("button[data-i]"); if(!b) return;
+  const x = cand[+b.dataset.i];
+  add(x.part, x.name, x.img, curCol);
+  b.textContent = "Ajouté ✓";
+  b.style.background = "#10b981";
+  b.style.borderColor = "#10b981";
+};
+
+/* Image fallback mechanism */
+const imgTag = x => {
+  const c = x.color ?? curCol;
+  const isPrinted = x.part && /(pb|pr)/i.test(x.part);
+  let u = x.img;
+
+  if (c != 9999 && x.part) {
+    u = isPrinted
+      ? "https://cdn.rebrickable.com/media/parts/photos/" + c + "/" + encodeURIComponent(x.part) + ".jpg"
+      : "https://cdn.rebrickable.com/media/parts/ldraw/" + c + "/" + encodeURIComponent(x.part) + ".png";
+  }
+
+  return u ? `<img src="${esc(u)}" data-part="${esc(x.part||"")}" data-color="${c}" data-fb="${esc(x.img||"")}" alt="" referrerpolicy="no-referrer">` : "";
+};
+
+document.addEventListener("error", e => {
+  const t = e.target;
+  if (t.tagName === "IMG" && t.dataset.fb) {
+    const currentSrc = t.getAttribute("src");
+    const part = t.dataset.part;
+    const c = t.dataset.color;
+
+    if (part && c) {
+      const photoUrl = "https://cdn.rebrickable.com/media/parts/photos/" + c + "/" + encodeURIComponent(part) + ".jpg";
+      const ldrawUrl = "https://cdn.rebrickable.com/media/parts/ldraw/" + c + "/" + encodeURIComponent(part) + ".png";
+
+      if (currentSrc === ldrawUrl) {
+        t.src = photoUrl;
+        return;
+      } else if (currentSrc === photoUrl && t.dataset.fb !== photoUrl) {
+        t.src = t.dataset.fb;
+        return;
+      }
+    }
+
+    if (currentSrc !== t.dataset.fb) {
+      t.src = t.dataset.fb;
+    }
+  }
+}, true);
+
+document.addEventListener("visibilitychange", () => {
+  if(!document.hidden) pull();
+});
+
+render();
+renderRes();
+if(gid) { showCode(); pull(); }
+</script>
+</body>
+</html>
