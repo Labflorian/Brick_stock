@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brick Stock</title>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--tx:#1d1d1b;--mut:#6b6a66;--ac:#d01012;--bd:#e3e1da;color-scheme:light dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root{--bg:#161615;--card:#212120;--tx:#f1efe9;--mut:#9b9a94;--bd:#33332f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:560px;margin:0 auto;padding-bottom:84px}
+header{padding:16px 16px 8px}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mut);font-size:13px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px);max-width:560px;margin:0 auto}
+nav button{flex:1;padding:14px;border:0;background:none;color:var(--mut);font:600 15px system-ui,sans-serif}
+nav button.on{color:var(--ac)}
+section{display:none;padding:8px 16px}
+section.on{display:block}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px;margin:8px 0;display:flex;gap:10px;align-items:center}
+.card img{width:56px;height:56px;object-fit:contain;border-radius:8px;background:#fff;flex:none}
+.grow{flex:1;min-width:0}
+.name{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{color:var(--mut);font-size:12px}
+.qty{display:flex;align-items:center;gap:6px}
+.qty button,.btn{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;min-width:36px;height:36px;font:600 16px system-ui,sans-serif;padding:0 12px}
+.btn.pri{background:var(--ac);border-color:var(--ac);color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+input,select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-size:16px}
+video{width:100%;border-radius:12px;background:#000;aspect-ratio:4/3;object-fit:cover}
+#status{color:var(--mut);font-size:13px;min-height:20px;margin:6px 0}
+.empty{color:var(--mut);text-align:center;padding:32px 0}
+label.chk{display:flex;align-items:center;gap:6px;font-size:14px}
+label.chk input{width:auto}
+</style></head>
+<body>
+<header><h1>Brick Stock</h1><div class="sub" id="total"></div></header>
+
+<section id="s-stock" class="on">
+  <input id="q" type="search" placeholder="Rechercher une pièce…">
+  <div class="row">
+    <button class="btn pri" id="exp">Exporter pour Rebrickable (CSV)</button>
+    <button class="btn" id="cp">Copier</button>
+  </div>
+  <div id="list"></div>
+</section>
+
+<section id="s-scan">
+  <video id="v" playsinline muted></video>
+  <div class="row">
+    <button class="btn pri" id="cam">Démarrer la caméra</button>
+    <button class="btn" id="snap">Scanner</button>
+    <label class="chk"><input type="checkbox" id="auto"> Auto (2,5 s)</label>
+  </div>
+  <label class="sub" for="col">Couleur appliquée aux ajouts</label>
+  <select id="col"></select>
+  <div id="status"></div>
+  <div id="res"></div>
+</section>
+
+<nav><button id="t-stock" class="on">Stock</button><button id="t-scan">Scan</button></nav>
+
+<script>
+const COLORS=[[9999,"Toute couleur"],[0,"Noir"],[15,"Blanc"],[4,"Rouge"],[1,"Bleu"],[14,"Jaune"],[2,"Vert"],[25,"Orange"],[6,"Marron"],[88,"Marron rougeâtre"],[19,"Beige"],[72,"Gris bleuté foncé"],[71,"Gris bleuté clair"]];
+const colName=id=>(COLORS.find(c=>c[0]==id)||[0,"Couleur "+id])[1];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let stock=[];
+try{stock=JSON.parse(localStorage.getItem("brickstock")||"[]")}catch(e){}
+const save=()=>{try{localStorage.setItem("brickstock",JSON.stringify(stock))}catch(e){}};
+
+$("col").innerHTML=COLORS.map(c=>`<option value="${c[0]}">${c[1]}</option>`).join("");
+
+function tab(n){
+  ["stock","scan"].forEach(k=>{$("s-"+k).classList.toggle("on",k==n);$("t-"+k).classList.toggle("on",k==n)});
+  if(n!="scan")stopCam();
+}
+$("t-stock").onclick=()=>tab("stock");
+$("t-scan").onclick=()=>tab("scan");
+
+function add(part,name,img,color){
+  const k=part+"|"+color;
+  const it=stock.find(x=>x.k==k);
+  if(it)it.qty++;else stock.push({k,part,name,img,color,qty:1});
+  save();render();
+}
+function render(){
+  const f=$("q").value.trim().toLowerCase();
+  const rows=stock.filter(x=>!f||(x.part+" "+x.name).toLowerCase().includes(f));
+  const n=stock.reduce((a,x)=>a+x.qty,0);
+  $("total").textContent=`${n} pièce${n>1?"s":""} · ${stock.length} référence${stock.length>1?"s":""}`;
+  $("list").innerHTML=rows.length?rows.map(x=>`<div class="card">
+    ${x.img?`<img src="${esc(x.img)}" alt="" referrerpolicy="no-referrer">`:""}
+    <div class="grow"><div class="name">${esc(x.name)}</div><div class="meta">#${esc(x.part)} · ${esc(colName(x.color))}</div></div>
+    <div class="qty"><button data-k="${esc(x.k)}" data-d="-1">−</button><b>${x.qty}</b><button data-k="${esc(x.k)}" data-d="1">+</button></div></div>`).join("")
+    :`<div class="empty">Stock vide. Passez par l’onglet Scan pour ajouter des pièces.</div>`;
+}
+$("list").onclick=e=>{
+  const b=e.target.closest("button[data-k]");if(!b)return;
+  const it=stock.find(x=>x.k==b.dataset.k);if(!it)return;
+  it.qty+=+b.dataset.d;
+  if(it.qty<=0)stock=stock.filter(x=>x!==it);
+  save();render();
+};
+$("q").oninput=render;
+
+/* Export Rebrickable : Part,Color,Quantity */
+function csv(){
+  const q=s=>/[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+  return "Part,Color,Quantity\n"+stock.map(x=>`${q(String(x.part))},${x.color},${x.qty}`).join("\n")+"\n";
+}
+$("exp").onclick=()=>{
+  if(!stock.length)return alert("Le stock est vide.");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv()],{type:"text/csv"}));
+  a.download="rebrickable-stock.csv";document.body.appendChild(a);a.click();a.remove();
+};
+$("cp").onclick=async()=>{
+  try{await navigator.clipboard.writeText(csv());$("cp").textContent="Copié ✓";setTimeout(()=>$("cp").textContent="Copier",1500)}
+  catch(e){prompt("Copiez le CSV :",csv())}
+};
+
+/* Caméra + Brickognize */
+let stream=null,timer=null,busy=false;
+const v=$("v"),st=t=>$("status").textContent=t;
+async function startCam(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+    v.srcObject=stream;await v.play();$("cam").textContent="Arrêter la caméra";st("Caméra prête. Placez une pièce devant l’objectif.");
+  }catch(e){st("Caméra inaccessible : "+e.message+" (HTTPS ou autorisation requis).")}
+}
+function stopCam(){
+  clearInterval(timer);timer=null;$("auto").checked=false;
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;v.srcObject=null}
+  $("cam").textContent="Démarrer la caméra";
+}
+$("cam").onclick=()=>stream?stopCam():startCam();
+$("auto").onchange=e=>{
+  clearInterval(timer);
+  if(e.target.checked){if(!stream){e.target.checked=false;return st("Démarrez d’abord la caméra.")}timer=setInterval(scan,2500)}
+};
+$("snap").onclick=scan;
+
+const rbNum=it=>{
+  const s=(it.external_sites||[]).find(x=>/rebrickable\.com\/parts\//.test(x.url||""));
+  const m=s&&s.url.match(/parts\/([^\/?#]+)/);
+  return m?m[1]:it.id;
+};
+async function scan(){
+  if(busy||!stream||!v.videoWidth)return;
+  busy=true;st("Analyse en cours…");
+  const c=document.createElement("canvas"),k=Math.min(1,640/v.videoWidth);
+  c.width=v.videoWidth*k;c.height=v.videoHeight*k;
+  c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+  const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",.85));
+  const fd=new FormData();fd.append("query_image",blob,"frame.jpg");
+  try{
+    const r=await fetch("https://api.brickognize.com/predict/parts/",{method:"POST",body:fd});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    show((d.items||[]).slice(0,3));
+  }catch(e){st("Erreur Brickognize : "+e.message)}
+  busy=false;
+}
+let cand=[];
+function show(items){
+  cand=items.map(it=>({part:rbNum(it),name:it.name,img:it.img_url,score:it.score}));
+  st(cand.length?"Touchez « Ajouter » sur la bonne pièce.":"Aucune pièce reconnue, réessayez.");
+  $("res").innerHTML=cand.map((x,i)=>`<div class="card">
+    ${x.img?`<img src="${esc(x.img)}" alt="" referrerpolicy="no-referrer">`:""}
+    <div class="grow"><div class="name">${esc(x.name)}</div><div class="meta">#${esc(x.part)} · ${Math.round((x.score||0)*100)} %</div></div>
+    <button class="btn pri" data-i="${i}">Ajouter</button></div>`).join("");
+}
+$("res").onclick=e=>{
+  const b=e.target.closest("button[data-i]");if(!b)return;
+  const x=cand[+b.dataset.i];
+  add(x.part,x.name,x.img,$("col").value);
+  b.textContent="Ajouté ✓";
+};
+render();
+</script>
+</body></html>
