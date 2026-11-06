@@ -364,6 +364,7 @@ input:focus, select:focus { border-color: var(--primary); }
   flex-direction: column;
   gap: 8px;
   height: calc(100vh - 130px);
+  height: calc(100dvh - 130px);
 }
 #s-scan.on { display: flex; }
 
@@ -638,6 +639,18 @@ video {
 .empty { text-align: center; padding: 20px 10px; color: var(--text-muted); font-size: 12px; }
 .chk { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
 .chk input { width: auto; }
+.cand-card { flex-wrap: wrap; }
+.cand-card .btn.pri { padding: 10px 14px; font-size: 14px; }
+.quick-swatches { flex: 1 0 100%; flex-wrap: wrap; gap: 10px; margin-top: 2px; }
+.quick-swatch { width: 32px; height: 32px; border-width: 2px; }
+.quick-swatch.active { outline: 3px solid var(--primary); outline-offset: 2px; }
+.cand-col { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.cand-col.warn { color: var(--warning); }
+.cand-col .sw { width: 14px; height: 14px; }
+img.generic { filter: grayscale(1); opacity: .7; }
+.scan-bottom { gap: 10px; padding-top: 4px; }
+.scan-bottom #snap { flex: 1; font-size: 17px; padding: 16px 12px; border-radius: 16px; }
+.scan-bottom .color-badge-btn { padding: 16px 12px; }
 </style>
 </head>
 <body>
@@ -762,14 +775,6 @@ video {
       <div class="cam-zoom-badge" id="zoom-badge">Zoom 1.0x</div>
     </div>
 
-    <div class="scan-toolbar">
-      <button class="btn pri full" id="snap" style="font-size: 15px; padding: 10px;">📷 Scanner la pièce</button>
-      <div class="color-badge-btn" id="open-color-picker">
-        <span class="sw" id="scan-col-sw" style="background:#CCCCCC"></span>
-        <span id="scan-col-label">Toute couleur</span> ▾
-      </div>
-    </div>
-
     <div class="row" style="margin: 0; align-items: center; justify-content: space-between;">
       <label class="chk">
         <input type="checkbox" id="autocol" checked> Couleur auto de la pièce
@@ -792,6 +797,14 @@ video {
         <span class="sub" id="scan-count-tag">0 réponse</span>
       </div>
       <div class="cand-grid" id="res"></div>
+    </div>
+
+    <div class="scan-toolbar scan-bottom">
+      <div class="color-badge-btn" id="open-color-picker">
+        <span class="sw" id="scan-col-sw" style="background:#CCCCCC"></span>
+        <span id="scan-col-label">Toute couleur</span> ▾
+      </div>
+      <button class="btn pri" id="snap">📷 Scanner la pièce</button>
     </div>
   </section>
 </main>
@@ -1865,16 +1878,20 @@ function renderRes() {
 
   const QUICK_SWATCHES = [...new Set([...suggested, 0, 15, 4, 59, 1, 14, 2, 25, 71])].slice(0, 9);
 
+  const colLabel = curCol === 9999
+    ? `<span class="cand-col warn">Couleur ?</span>`
+    : `<span class="cand-col"><span class="sw" style="background:${colRgb(curCol)}"></span>${esc(colName(curCol))}</span>`;
+
   $("res").innerHTML = cand.map((x, i) => `<div class="cand-card">
     ${imgTag(x)}
     <div class="grow">
-      <div class="pn">${esc(x.part)}</div>
+      <div class="pn">${esc(x.part)} ${colLabel}</div>
       <div class="name">${esc(x.name)}</div>
-      <div class="quick-swatches">
-        ${QUICK_SWATCHES.map(cId => `<span class="quick-swatch ${cId==curCol?'active':''}" style="background:${colRgb(cId)}" title="${esc(colName(cId))}" data-item="${i}" data-cid="${cId}"></span>`).join("")}
-      </div>
     </div>
-    <button class="btn pri sm" data-i="${i}">+ Ajouter</button>
+    <button class="btn pri" data-i="${i}">+ Ajouter</button>
+    <div class="quick-swatches">
+      ${QUICK_SWATCHES.map(cId => `<span class="quick-swatch ${cId==curCol?'active':''}" style="background:${colRgb(cId)}" title="${esc(colName(cId))}" data-item="${i}" data-cid="${cId}"></span>`).join("")}
+    </div>
   </div>`).join("");
 }
 
@@ -1916,28 +1933,34 @@ const imgTag = x => {
   return u ? `<img src="${esc(u)}" data-part="${esc(x.part||"")}" data-color="${c}" data-fb="${esc(x.img||"")}" alt="" referrerpolicy="no-referrer">` : "";
 };
 
-document.addEventListener("error", e => {
+const imgCache = (() => { try { return JSON.parse(LS("bs_imgc") || "{}"); } catch(e) { return {}; } })();
+async function rbPartImg(part, c) {   // image officielle Rebrickable pour CE couple pièce/couleur (si clé API)
+  const k = part + "|" + c;
+  if (k in imgCache) return imgCache[k];
+  if (!rbKey) return "";
+  try {
+    const r = await fetch("https://rebrickable.com/api/v3/lego/parts/" + encodeURIComponent(part) + "/colors/" + c + "/?key=" + rbKey);
+    if (r.status === 404) imgCache[k] = "";
+    else if (r.ok) imgCache[k] = (await r.json()).part_img_url || "";
+    else return "";
+    LSset("bs_imgc", JSON.stringify(imgCache));
+    return imgCache[k];
+  } catch(e) { return ""; }
+}
+
+// Chaîne : rendu LDraw → photo → API Rebrickable → image générique en gris (forme seule, pas de fausse couleur)
+document.addEventListener("error", async e => {
   const t = e.target;
-  if (t.tagName === "IMG" && t.dataset.fb) {
-    const currentSrc = t.getAttribute("src");
-    const part = t.dataset.part;
-    const c = t.dataset.color;
-
-    if (part && c) {
-      const photoUrl = "https://cdn.rebrickable.com/media/parts/photos/" + c + "/" + encodeURIComponent(part) + ".jpg";
-      const ldrawUrl = "https://cdn.rebrickable.com/media/parts/ldraw/" + c + "/" + encodeURIComponent(part) + ".png";
-
-      if (currentSrc === ldrawUrl) {
-        t.src = photoUrl;
-        return;
-      } else if (currentSrc === photoUrl && t.dataset.fb !== photoUrl) {
-        t.src = t.dataset.fb;
-        return;
-      }}
-
-    if (currentSrc !== t.dataset.fb) {
-      t.src = t.dataset.fb;
-    }
+  if (t.tagName !== "IMG" || !t.dataset.part) return;
+  const part = t.dataset.part, c = t.dataset.color, cur = t.getAttribute("src") || "";
+  if (cur.includes("/ldraw/")) { t.src = "https://cdn.rebrickable.com/media/parts/photos/" + c + "/" + encodeURIComponent(part) + ".jpg"; return; }
+  if (cur.includes("/photos/")) {
+    const u = await rbPartImg(part, c);
+    if (u) { t.src = u; return; }
+  }
+  if (t.dataset.fb && cur !== t.dataset.fb) {
+    t.classList.add("generic"); t.title = "Image indisponible dans cette couleur";
+    t.src = t.dataset.fb;
   }
 }, true);
 
