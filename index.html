@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<script>try{var t=localStorage.getItem("brickstock-theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <title>BrickStock — Gestionnaire, Scanner & Sets LEGO</title>
 <style>
 :root {
@@ -24,16 +25,26 @@
   box-sizing: border-box;
 }
 
+:root { --bar-bg: rgba(15, 17, 21, 0.88); --nav-bg: rgba(24, 26, 32, 0.92); }
 @media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f3f4f6;
-    --card-bg: #ffffff;
-    --card-border: #e5e7eb;
-    --card-hover: #f9fafb;
-    --text-main: #111827;
-    --text-muted: #6b7280;
+  :root:not([data-theme="dark"]) {
+    --bg: #f3f4f6; --card-bg: #ffffff; --card-border: #e5e7eb; --card-hover: #f9fafb;
+    --text-main: #111827; --text-muted: #6b7280;
+    --bar-bg: rgba(255, 255, 255, 0.92); --nav-bg: rgba(255, 255, 255, 0.94);
     color-scheme: light;
   }
+}
+:root[data-theme="light"] {
+  --bg: #f3f4f6; --card-bg: #ffffff; --card-border: #e5e7eb; --card-hover: #f9fafb;
+  --text-main: #111827; --text-muted: #6b7280;
+  --bar-bg: rgba(255, 255, 255, 0.92); --nav-bg: rgba(255, 255, 255, 0.94);
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115; --card-bg: #181a20; --card-border: #262933; --card-hover: #20232c;
+  --text-main: #f3f4f6; --text-muted: #9ca3af;
+  --bar-bg: rgba(15, 17, 21, 0.88); --nav-bg: rgba(24, 26, 32, 0.92);
+  color-scheme: dark;
 }
 
 * {
@@ -68,7 +79,7 @@ header {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(15, 17, 21, 0.88);
+  background: var(--bar-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--card-border);
@@ -135,7 +146,7 @@ nav {
   right: 0;
   bottom: 0;
   z-index: 30;
-  background: rgba(24, 26, 32, 0.92);
+  background: var(--nav-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--card-border);
@@ -363,9 +374,11 @@ input:focus, select:focus { border-color: var(--primary); }
   display: none;
   flex-direction: column;
   gap: 8px;
-  height: calc(100vh - 130px);
-  height: calc(100dvh - 130px);
+  height: calc(100vh - var(--hdr-h, 56px) - var(--nav-h, 62px));
+  height: calc(100dvh - var(--hdr-h, 56px) - var(--nav-h, 62px));
 }
+body.scan-mode { height: 100dvh; overflow: hidden; }
+body.scan-mode main { overflow: hidden; padding-bottom: 0; }
 #s-scan.on { display: flex; }
 
 .vw-container {
@@ -513,6 +526,9 @@ video {
   flex-direction: column;
   gap: 6px;
   padding-right: 2px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .cand-card {
@@ -644,6 +660,8 @@ video {
 .quick-swatches { flex: 1 0 100%; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 .quick-swatch { width: 24px; height: 24px; }
 .quick-swatch.active { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sw-sep { flex: 1 0 100%; height: 0; }
+.quick-swatch.trans { border: 1px dashed var(--text-muted); background: linear-gradient(color-mix(in srgb, var(--c) 75%, transparent), color-mix(in srgb, var(--c) 75%, transparent)), repeating-conic-gradient(#999 0% 25%, #fff 0% 50%) 50% / 10px 10px; }
 .cand-col { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .cand-col.warn { color: var(--warning); }
 .cand-col .sw { width: 14px; height: 14px; }
@@ -664,6 +682,7 @@ img.generic { filter: grayscale(1); opacity: .7; }
     </div>
   </div>
   <div class="header-actions">
+    <button class="icon-btn" id="btn-theme" title="Changer de thème" style="font-size:16px">🌙</button>
     <button class="icon-btn" id="btn-sync-modal" title="Synchronisation GitHub Gist & Clé API">
       <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/></svg>
     </button>
@@ -1404,6 +1423,7 @@ function tab(n) {
       if(btn) btn.classList.toggle("on", k === n);
     });
 
+    document.body.classList.toggle("scan-mode", n === "scan"); if (window.setBars) setBars();
     if (n === "scan") {
       if (!stream) startCam();
       else v.play().catch(() => {});
@@ -1812,6 +1832,7 @@ function renderRes() {
     return;
   }
 
+  const TRANS_SWATCHES = [47, 36, 33, 43, 34, 46, 182, 40];
   const QUICK_SWATCHES = [...new Set([...suggested, 0, 15, 4, 320, 1, 14, 2, 25, 71])].slice(0, 9);
 
   const colLabel = curCol === 9999
@@ -1827,6 +1848,8 @@ function renderRes() {
     <button class="btn pri" data-i="${i}">+ Ajouter</button>
     <div class="quick-swatches">
       ${QUICK_SWATCHES.map(cId => `<span class="quick-swatch ${cId==curCol?'active':''}" style="background:${colRgb(cId)}" title="${esc(colName(cId))}" data-item="${i}" data-cid="${cId}"></span>`).join("")}
+      <span class="sw-sep"></span>
+      ${TRANS_SWATCHES.map(cId => `<span class="quick-swatch trans ${cId==curCol?'active':''}" style="--c:${colRgb(cId)}" title="${esc(colName(cId))}" data-item="${i}" data-cid="${cId}"></span>`).join("")}
     </div>
   </div>`).join("");
 }
@@ -1910,6 +1933,21 @@ document.addEventListener("visibilitychange", () => {
 render();
 renderRes();
 if(gid) { showCode(); pull(); }
+</script>
+<script>
+(function(){
+  const r = document.documentElement, b = document.getElementById("btn-theme");
+  const cur = () => r.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const paint = () => { const d = cur() === "dark"; b.textContent = d ? "☀️" : "🌙"; b.title = d ? "Passer en mode jour" : "Passer en mode nuit"; };
+  b.onclick = () => { const n = cur() === "dark" ? "light" : "dark"; r.dataset.theme = n; try { localStorage.setItem("brickstock-theme", n); } catch(e) {} paint(); };
+  paint();
+  window.setBars = () => {
+    const h = document.querySelector("header"), n = document.querySelector("nav");
+    r.style.setProperty("--hdr-h", h.offsetHeight + "px");
+    r.style.setProperty("--nav-h", n.offsetHeight + "px");
+  };
+  window.addEventListener("resize", setBars); setBars();
+})();
 </script>
 </body>
 </html>
