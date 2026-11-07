@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<script>try{var t=localStorage.getItem("brickstock-theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<script>try{var d=document.documentElement,m=localStorage.getItem("bs_mode")||localStorage.getItem("brickstock-theme");if(m&&m!=="auto")d.dataset.theme=m;d.dataset.style=localStorage.getItem("bs_style")||"brick";d.dataset.btn=localStorage.getItem("bs_btn")||"soft";}catch(e){}</script>
 <title>BrickStock — Gestionnaire, Scanner & Sets LEGO</title>
 <style>
 :root {
@@ -687,6 +687,26 @@ img.generic { filter: grayscale(1); opacity: .7; }
 .stepper .btn { flex: none; width: 52px; font-size: 22px; }
 #toast { z-index: 300; }
 .seg.s4 button { font-size: 11px; padding: 8px 2px; }
+#s-figs { display: none; } #s-figs.on { display: block; }
+:root[data-style="ocean"] { --primary: #2563eb; --primary-hover: #3b82f6; }
+:root[data-style="forest"] { --primary: #16a34a; --primary-hover: #22c55e; }
+:root[data-style="slate"] { --primary: #64748b; --primary-hover: #94a3b8; }
+:root[data-btn="soft"] .btn.pri { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+:root[data-btn="soft"] .btn.pri:hover { background: color-mix(in srgb, var(--primary) 26%, transparent); }
+:root[data-btn="soft"] .seg button.on { background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--primary); }
+.qstep { display: flex; align-items: center; gap: 4px; flex: none; }
+.qstep button { width: 30px; height: 36px; border-radius: 8px; border: 1px solid var(--card-border); background: var(--card-hover); color: var(--text-main); font-size: 18px; font-weight: 700; }
+.qstep b { min-width: 16px; text-align: center; }
+.fgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.fcard { position: relative; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 8px; text-align: center; cursor: pointer; }
+.fcard img { width: 100%; height: 110px; object-fit: contain; background: #fff; border-radius: 8px; }
+.fcard .fn { font-size: 12px; font-weight: 700; margin-top: 6px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.fcard .fm { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.fcard .fq { position: absolute; top: 6px; right: 6px; background: var(--primary); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
+.fig-h { margin: 14px 0 6px; font-weight: 800; font-size: 13px; }
+#undo-bar { display: none; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h, 62px) + 12px); z-index: 300; align-items: center; gap: 12px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 8px 8px 8px 16px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+#undo-bar.show { display: flex; }
+#undo-bar button { border: 0; border-radius: 14px; padding: 7px 14px; background: var(--primary); color: #fff; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -700,10 +720,7 @@ img.generic { filter: grayscale(1); opacity: .7; }
     </div>
   </div>
   <div class="header-actions">
-    <button class="icon-btn" id="btn-theme" title="Changer de thème" style="font-size:16px">🌙</button>
-    <button class="icon-btn" id="btn-sync-modal" title="Synchronisation GitHub Gist & Clé API">
-      <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/></svg>
-    </button>
+    <button class="icon-btn" id="btn-sync-modal" title="Paramètres" style="font-size:18px">⚙️</button>
   </div>
 </header>
 
@@ -713,11 +730,22 @@ img.generic { filter: grayscale(1); opacity: .7; }
 <div class="modal-overlay" id="modal-sync">
   <div class="modal-card">
     <div class="modal-header">
-      <h3>☁ Configuration & Synchro</h3>
+      <h3>⚙️ Paramètres</h3>
       <button class="icon-btn" onclick="document.getElementById('modal-sync').classList.remove('open')">✕</button>
     </div>
     
-    <div style="font-weight: 700; font-size: 13px; margin-bottom: 6px;">Clé API Rebrickable (pour les inventaires de Sets)</div>
+    <div style="font-weight: 700; font-size: 13px; margin-bottom: 6px;">Apparence</div>
+    <div class="sub">Mode</div>
+    <div class="seg" id="ap-mode"><button data-v="auto">Auto</button><button data-v="light">☀️ Jour</button><button data-v="dark">🌙 Nuit</button></div>
+    <div class="sub">Style</div>
+    <div class="seg" id="ap-style"><button data-v="brick">🟥 Brique</button><button data-v="ocean">🟦 Océan</button><button data-v="forest">🟩 Forêt</button><button data-v="slate">⬜ Ardoise</button></div>
+    <div class="sub">Gros boutons</div>
+    <div class="seg" id="ap-btn"><button data-v="soft">Discrets</button><button data-v="solid">Pleins</button></div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0 4px"><input type="checkbox" id="ap-hap"> Vibration au toucher</label>
+
+    <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 12px 0;">
+
+    <div style="font-weight: 700; font-size: 13px; margin-bottom: 6px;">Clé API Rebrickable (inventaires, minifigs)</div>
     <div style="display: flex; gap: 6px; margin-bottom: 14px;">
       <input id="rb-key-input" type="password" placeholder="Clé Rebrickable (ex: 1234abcd...)">
       <button class="btn pri sm" id="save-rb-key">Sauvegarder</button>
@@ -729,6 +757,8 @@ img.generic { filter: grayscale(1); opacity: .7; }
     <div id="bk-info" class="sub" style="margin-bottom: 8px;"></div>
     <div class="row"><button class="btn sm" id="bk-export">📤 Exporter</button><button class="btn sm" id="bk-import">📥 Importer</button></div>
     <input type="file" id="bk-file" accept="application/json,.json" style="display:none">
+    <details style="margin-top:12px"><summary class="sub" style="cursor:pointer">Zone sensible</summary>
+      <button class="btn sm full" id="btn-clear-stock" style="margin-top:8px;color:var(--primary)">🗑 Vider tout le stock</button></details>
 
     <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 12px 0;">
 
@@ -808,6 +838,13 @@ img.generic { filter: grayscale(1); opacity: .7; }
     <div id="set-collection"></div>
   </section>
 
+  <section id="s-figs">
+    <div class="row"><input id="fig-q" type="search" placeholder="Chercher une minifig (ex: Spider-Man, Kai)…"><button class="btn pri" id="fig-go" style="flex: none;">Chercher</button></div>
+    <div id="fig-status" class="sub" style="margin-bottom: 10px; text-align: center;">Cherche une minifigurine complète pour l'ajouter à ta collection.</div>
+    <div id="fig-results"></div>
+    <div id="fig-coll"></div>
+  </section>
+
   <!-- SCAN TAB -->
   <section id="s-scan">
     <div class="vw-container" id="vw-box">
@@ -862,6 +899,10 @@ img.generic { filter: grayscale(1); opacity: .7; }
   <button id="t-sets">
     <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
     Sets
+  </button>
+  <button id="t-figs">
+    <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+    Minifigs
   </button>
   <button id="t-scan">
     <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
@@ -1113,7 +1154,7 @@ const colRgb = id => "#" + ((COLORS.find(c => c[0] == id) || [0,0,"CCCCCC"])[2])
 const $ = id => document.getElementById(id);
 const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-const triggerHaptic = () => { if (navigator.vibrate) navigator.vibrate(40); };
+const triggerHaptic = () => { if (navigator.vibrate && localStorage.getItem("bs_haptic") !== "0") navigator.vibrate(40); };
 
 let stock = [];
 try {
@@ -1341,8 +1382,10 @@ const med = a => { const s = Array.from(a).sort((x, y) => x - y); return s[s.len
 
 // Distance : L pesé moins pour les couleurs vives (l'exposition varie), pleinement pour noir/blanc/gris
 function colDist(t, p) {
-  const wL = Math.hypot(t[1], t[2]) > 20 ? 0.5 : 1.0;
-  return Math.hypot(wL * (t[0] - p[0]), t[1] - p[1], t[2] - p[2]);
+  const ct = Math.hypot(t[1], t[2]), cp = Math.hypot(p[1], p[2]), wL = ct > 20 ? 0.5 : 1.0;
+  // un orange vif et une couleur chair ont presque la même teinte : on compare aussi la vivacité (chroma / luminosité)
+  const viv = ct > 25 ? 22 * Math.abs(ct / Math.max(t[0], 25) - cp / Math.max(p[0], 25)) : 0;
+  return Math.hypot(wL * (t[0] - p[0]), t[1] - p[1], t[2] - p[2]) + viv;
 }
 
 function analyseColor(canvas) {
@@ -1442,7 +1485,7 @@ function tab(n) {
     // Close active modals on tab change if any were left open
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
 
-    ["stock", "sets", "scan"].forEach(k => {
+    ["stock", "sets", "figs", "scan"].forEach(k => {
       const sec = $("s-" + k);
       const btn = $("t-" + k);
       if(sec) sec.classList.toggle("on", k === n);
@@ -1451,6 +1494,7 @@ function tab(n) {
 
     document.body.classList.toggle("scan-mode", n === "scan"); if (window.setBars) setBars();
     if (n === "sets" && window.renderCollection) renderCollection();
+    if (n === "figs" && window.renderFigs) renderFigs();
     if (n === "scan") {
       if (!stream) startCam();
       else v.play().catch(() => {});
@@ -1475,17 +1519,18 @@ function bindTabBtn(id, targetTab) {
 
 bindTabBtn("t-stock", "stock");
 bindTabBtn("t-sets", "sets");
+bindTabBtn("t-figs", "figs");
 bindTabBtn("t-scan", "scan");
 
 /* Stock Logic */
-function add(part, name, img, color) {
+function add(part, name, img, color, n = 1) {
   const k = part + "|" + color;
   const it = stock.find(x => x.k == k);
-  if(it) it.qty++;
-  else stock.push({ k, part, name, img, color, qty: 1, addedAt: Date.now(), cv: 2 });
+  if(it) it.qty += n;
+  else stock.push({ k, part, name, img, color, qty: n, addedAt: Date.now(), cv: 2 });
   save(); render();
   triggerHaptic();
-  showToast("+1 " + (name || part) + " (" + colName(color) + ")");
+  showToast("+" + n + " " + (name || part) + " (" + colName(color) + ")");
 }
 
 function render() {
@@ -1616,7 +1661,7 @@ async function fetchSetParts(setNum) {
   const container = $("set-parts-container");
   if(!rbKey) {
     container.innerHTML = `<div class="empty" style="margin-top:10px;">
-      Pour charger la liste interactive des pièces et comparer avec votre stock, ajoutez votre <b>clé API Rebrickable gratuite</b> dans le menu ☁ Configuration (en haut à droite).<br><br>
+      Pour charger la liste interactive des pièces et comparer avec votre stock, ajoutez votre <b>clé API Rebrickable gratuite</b> dans le menu ⚙️ Paramètres (en haut à droite).<br><br>
       <a href="https://rebrickable.com/api/" target="_blank" rel="noopener" class="btn pri sm">Obtenir une clé Rebrickable gratuite</a>
     </div>`;
     return;
@@ -1857,6 +1902,7 @@ async function scan() {
 }
 
 let cand = [], suggested = [], colorNote = "";
+let candQty = {};
 function renderRes() {
   $("scan-count-tag").textContent = cand.length + " réponse" + (cand.length > 1 ? 's' : '');
   if(!cand.length) {
@@ -1877,6 +1923,7 @@ function renderRes() {
       <div class="pn">${esc(x.part)} ${colLabel}</div>
       <div class="name">${esc(x.name)}</div>
     </div>
+    <div class="qstep"><button data-qi="${i}" data-qd="-1">−</button><b data-qv="${i}">${candQty[i] || 1}</b><button data-qi="${i}" data-qd="1">+</button></div>
     <button class="btn pri" data-i="${i}">+ Ajouter</button>
     <div class="quick-swatches">
       ${QUICK_SWATCHES.map(cId => `<span class="quick-swatch ${cId==curCol?'active':''}" style="background:${colRgb(cId)}" title="${esc(colName(cId))}" data-item="${i}" data-cid="${cId}"></span>`).join("")}
@@ -1887,6 +1934,7 @@ function renderRes() {
 }
 
 function show(items) {
+  candQty = {};
   cand = items.map(it => ({ part: rbNum(it), name: it.name, img: it.img_url, score: it.score }));
   st((colorNote ? "Couleur : " + colorNote + " · " : "") + (cand.length ? "Choisissez la bonne pièce :" : "Aucune pièce reconnue. Essayez sous un autre angle."));
   renderRes();
@@ -1901,9 +1949,12 @@ $("res").onclick = e => {
     return;
   }
 
+  const qb = e.target.closest("button[data-qd]");
+  if (qb) { const i = +qb.dataset.qi; candQty[i] = Math.max(1, (candQty[i] || 1) + +qb.dataset.qd); const o = $("res").querySelector('[data-qv="' + i + '"]'); if (o) o.textContent = candQty[i]; triggerHaptic(); return; }
   const b = e.target.closest("button[data-i]"); if(!b) return;
   const x = cand[+b.dataset.i];
-  add(x.part, x.name, x.img, curCol);
+  add(x.part, x.name, x.img, curCol, candQty[+b.dataset.i] || 1);
+  candQty[+b.dataset.i] = 1; const qv = $("res").querySelector('[data-qv="' + b.dataset.i + '"]'); if (qv) qv.textContent = 1;
   b.textContent = "Ajouté ✓";
   b.style.background = "#10b981";
   b.style.borderColor = "#10b981";
@@ -1968,10 +2019,16 @@ if(gid) { showCode(); pull(); }
 </script>
 <script>
 (function(){
-  const r = document.documentElement, b = document.getElementById("btn-theme");
-  const cur = () => r.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-  const paint = () => { const d = cur() === "dark"; b.textContent = d ? "☀️" : "🌙"; b.title = d ? "Passer en mode jour" : "Passer en mode nuit"; };
-  b.onclick = () => { const n = cur() === "dark" ? "light" : "dark"; r.dataset.theme = n; try { localStorage.setItem("brickstock-theme", n); } catch(e) {} paint(); };
+  const r = document.documentElement, keys = { mode: "bs_mode", style: "bs_style", btn: "bs_btn" }, $i = id => document.getElementById(id);
+  window.AP = { mode: LS("bs_mode") || LS("brickstock-theme") || "auto", style: LS("bs_style") || "brick", btn: LS("bs_btn") || "soft" };
+  const paint = () => {
+    if (AP.mode === "auto") delete r.dataset.theme; else r.dataset.theme = AP.mode;
+    r.dataset.style = AP.style; r.dataset.btn = AP.btn;
+    [["ap-mode", "mode"], ["ap-style", "style"], ["ap-btn", "btn"]].forEach(([id, k]) => $i(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === AP[k])));
+    $i("ap-hap").checked = LS("bs_haptic") !== "0";
+  };
+  ["ap-mode", "ap-style", "ap-btn"].forEach(id => { $i(id).onclick = e => { const b = e.target.closest("button[data-v]"); if (!b) return; const k = id.slice(3); AP[k] = b.dataset.v; LSset(keys[k], AP[k]); paint(); }; });
+  $i("ap-hap").onchange = e => LSset("bs_haptic", e.target.checked ? "1" : "0");
   paint();
   window.setBars = () => {
     const h = document.querySelector("header"), n = document.querySelector("nav");
@@ -1984,7 +2041,7 @@ if(gid) { showCode(); pull(); }
 <script>
 /* Collection de sets : catégories, fiche détail, réservation stricte */
 let currentSetData = null, setsCol = [], colCat = "todo", openNum = null, comboRows = [];
-const aggParts = list => { const m = {}; (list || []).forEach(p => { const k = p.k || (p.part + "|" + p.color); const o = m[k] = m[k] || { k, part: p.part, color: p.color, n: "", i: "", qty: 0 }; o.qty += p.qty; o.n = o.n || p.n || ""; o.i = o.i || p.i || ""; }); return Object.values(m); };
+const aggParts = list => { const m = {}; (list || []).forEach(p => { const k = p.k || (p.part + "|" + p.color); const o = m[k] = m[k] || { k, part: p.part, color: p.color, n: "", i: "", st: false, qty: 0 }; o.qty += p.qty; o.n = o.n || p.n || ""; o.i = o.i || p.i || ""; o.st = o.st || !!p.st; }); return Object.values(m); };
 const normSet = s => ({ manual: null, added: false, reserved: false, wish: false, ...s, parts: aggParts(s.parts) });
 let _T = null, EQC = {}, EQ = {};
 try { EQC = JSON.parse(localStorage.getItem("brickstock-equiv") || "{}"); } catch(e) {}
@@ -1997,7 +2054,7 @@ function buildEq() { // regroupe les pièces équivalentes (moules / alternative
 }
 const canonK = k => { const i = k.indexOf("|"), p = k.slice(0, i); return (EQ[p] || p) + k.slice(i); };
 const saveSets = () => { _T = null; tStamp = Date.now(); LSset("bs_t", String(tStamp)); LSset("brickstock-sets", JSON.stringify(setsCol)); push(); };
-const needsOf = s => { const t = _tick(); let r = t.nd.get(s); if (!r) { const m = {}; s.parts.forEach(p => { const k = canonK(p.k); (m[k] = m[k] || { k, qty: 0, p }).qty += p.qty; }); r = Object.values(m); t.nd.set(s, r); } return r; };
+const needsOf = s => { const t = _tick(); let r = t.nd.get(s); if (!r) { const m = {}; s.parts.forEach(p => { if (p.st) return; const k = canonK(p.k); (m[k] = m[k] || { k, qty: 0, p }).qty += p.qty; }); r = Object.values(m); t.nd.set(s, r); } return r; };
 const stockMap = () => { const t = _tick(); if (!t.sm) { const m = {}; stock.forEach(x => { const k = canonK(x.k); m[k] = (m[k] || 0) + x.qty; }); t.sm = m; } return t.sm; };
 const stockQty = k => stockMap()[canonK(k)] || 0;
 const isCommitted = s => !s.wish && (s.reserved || (s.manual === "built" && s.added));
@@ -2032,30 +2089,51 @@ function tryReserve(s) {
 }
 
 function addAllToStock(s) {
-  if (s.added && !confirm("Les pièces de ce set sont déjà ajoutées au stock. Les ajouter une deuxième fois ?")) return;
   if (s.reserved && !confirm("Ce set est réservé : ses pièces sont déjà dans ton stock. Les ajouter quand même ?")) return;
   s.parts.forEach(p => {
+    if (p.st) return;
     const it = stock.find(x => x.k === p.k);
     if (it) it.qty += p.qty;
     else stock.push({ k: p.k, part: p.part, name: p.n || p.part, img: goodImg(p.i), color: p.color, qty: p.qty, addedAt: Date.now(), cv: 2 });
   });
-  s.added = true; s.manual = "built"; s.reserved = false;
   save(); render(); saveSets();
-  showToast("Pièces ajoutées au stock · set classé « Construit »");
+  showToast("Pièces ajoutées au stock");
+}
+function consume(s) { // les pièces du set sortent du stock (set monté avec ces pièces)
+  needsOf(s).forEach(n => { let left = n.qty; stock.filter(x => canonK(x.k) === n.k).sort((a, b) => (b.k === n.p.k) - (a.k === n.p.k)).forEach(it => { const t = Math.min(it.qty, left); it.qty -= t; left -= t; }); });
+  stock = stock.filter(x => x.qty > 0); save(); render();
+}
+function markBuilt(s) {
+  if (s.reserved) { if (!confirm("Les pièces réservées de ce set vont sortir du stock (elles sont dans le modèle monté). Continuer ?")) return false; consume(s); }
+  s.reserved = false; s.added = false; s.manual = "built"; return true;
+}
+function dismantle(s) {
+  if (!s.added) addAllToStock(s);
+  s.added = false; s.reserved = false; s.manual = null; showToast("Set démonté : pièces remises au stock");
+}
+const invParts = j => aggParts((j.results || []).filter(p => !p.is_spare).map(p => ({ k: p.part.part_num + "|" + p.color.id, part: p.part.part_num, color: p.color.id, n: p.part.name, i: goodImg(p.part.part_img_url), st: p.part.part_cat_id === 58 || /sticker/i.test(p.part.name || ""), qty: p.quantity })));
+async function refreshInv(s) {
+  if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ⚙️ Paramètres");
+  showToast("Mise à jour de l'inventaire…");
+  try {
+    const r = await fetch("https://rebrickable.com/api/v3/lego/sets/" + s.num + "/parts/?page_size=1000&key=" + rbKey);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    s.parts = invParts(await r.json()); saveSets(); renderCollection(); renderDetail(); showToast("Inventaire mis à jour ✓");
+  } catch(e) { showToast("Erreur : " + e.message); }
 }
 
-async function addSetToCollection(wish) {
-  const d = currentSetData; if (!d) return;
-  if (findSet(d.set_num)) { openSetDetail(d.set_num); return; }
-  if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ☁ Configuration");
+async function addSetToCollection(wish, dd) {
+  const d = dd || currentSetData; if (!d) return;
+  if (findSet(d.set_num)) { if (dd) showToast("Déjà dans ta collection ou tes envies"); else openSetDetail(d.set_num); return; }
+  if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ⚙️ Paramètres");
   showToast("Chargement de l'inventaire…");
   try {
     const r = await fetch("https://rebrickable.com/api/v3/lego/sets/" + d.set_num + "/parts/?page_size=1000&key=" + rbKey);
     if (!r.ok) throw new Error("HTTP " + r.status);
     const j = await r.json();
-    const parts = aggParts((j.results || []).filter(p => !p.is_spare).map(p => ({ k: p.part.part_num + "|" + p.color.id, part: p.part.part_num, color: p.color.id, n: p.part.name, i: goodImg(p.part.part_img_url), qty: p.quantity })));
+    const parts = invParts(j);
     setsCol.push({ num: d.set_num, name: d.name, img: d.set_img_url, year: d.year || "", manual: null, added: false, reserved: false, wish: !!wish, parts });
-    saveSets(); renderCollection(); openSetDetail(d.set_num);
+    saveSets(); renderCollection(); if (dd) showToast("Ajouté à tes envies ⭐"); else openSetDetail(d.set_num);
   } catch(e) { showToast("Erreur : " + e.message); }
 }
 
@@ -2063,13 +2141,13 @@ function renderCollection() {
   const el = $("set-collection"); if (!el) return;
   if (!setsCol.length) { el.innerHTML = ""; return; }
   const ck = conflictKeys(), cnt = { built: 0, todo: 0, missing: 0, wish: 0 }, info = new Map();
-  setsCol.forEach(s => { const c = setCat(s), miss = setMissing(s), need = s.parts.reduce((n, p) => n + p.qty, 0); cnt[c]++; info.set(s, { c, miss, need, pct: need ? Math.round((need - miss) / need * 100) : 0 }); });
+  setsCol.forEach(s => { const c = setCat(s), miss = setMissing(s), need = needsOf(s).reduce((n, x) => n + x.qty, 0); cnt[c]++; info.set(s, { c, miss, need, pct: need ? Math.round((need - miss) / need * 100) : 0 }); });
   const list = setsCol.filter(s => info.get(s).c === colCat);
   if (colCat === "missing" || colCat === "wish") list.sort((a, b) => info.get(a).miss - info.get(b).miss);
   const unb = setsCol.filter(s => ["todo", "missing"].includes(info.get(s).c));
   const ms = buyRows(unb).reduce((n, r) => n + r.miss, 0), nt = unb.reduce((n, s) => n + info.get(s).need, 0);
   const wmiss = setsCol.some(s => info.get(s).c === "wish" && info.get(s).miss > 0);
-  let top = "";
+  let top = '<button class="btn sm full" data-notices="1" style="margin-bottom:8px">📚 Notices de mes sets</button>';
   if (colCat === "todo" || colCat === "missing") {
     if (unb.length > 1) top += `<div class="set-card"><div class="pn">Tous les sets non construits ensemble</div>
       <div class="meta" style="color:${ms ? 'var(--warning)' : 'var(--success)'}">${ms ? plural(ms, "pièce") + " manquante" + (ms > 1 ? "s" : "") + " sur " + nt : "Ton stock couvre tout (" + nt + " pièces)"}</div></div>`;
@@ -2095,6 +2173,7 @@ function renderCollection() {
 
 $("set-collection").onclick = e => {
   const sg = e.target.closest("[data-cat]"); if (sg) { colCat = sg.dataset.cat; renderCollection(); return; }
+  const nt = e.target.closest("[data-notices]"); if (nt) { renderNotices(); $("modal-nt").classList.add("open"); return; }
   const by = e.target.closest("[data-buy]"); if (by) { if (by.dataset.buy === "wish") buyWish = true; renderBuy(); $("modal-buy").classList.add("open"); return; }
   const b = e.target.closest("[data-act]");
   if (b) { const s = findSet(b.dataset.num); if (s) { if (s.reserved) s.reserved = false; else if (!tryReserve(s)) return; saveSets(); renderCollection(); renderDetail(); triggerHaptic(); } return; }
@@ -2107,14 +2186,16 @@ let partSort = LS("brickstock-psort") || "miss";
 function openSetDetail(num) { openNum = num; renderDetail(); $("modal-set").classList.add("open"); }
 function renderDetail() {
   const s = findSet(openNum), box = $("modal-set-card"); if (!s) return;
-  const need = s.parts.reduce((n, p) => n + p.qty, 0), miss = setMissing(s), c = setCat(s), wish = c === "wish", clean = String(s.num).split("-")[0];
+  const c = setCat(s), wish = c === "wish", built = c === "built", inModel = built && !s.added, clean = String(s.num).split("-")[0];
+  const loose = s.parts.filter(p => !p.st), stick = s.parts.filter(p => p.st);
+  const need = loose.reduce((n, p) => n + p.qty, 0), miss = inModel ? 0 : setMissing(s);
   const sts = [["auto", "Auto"], ["built", "Construit"], ["todo", "À construire"], ["missing", "À compléter"]];
-  const parts = s.parts.map(p => ({ p, av: Math.min(p.qty, availFor(p.k, s.num)), eq: !!EQ[p.part] && stock.some(x => x.part !== p.part && x.color == p.color && canonK(x.k) === canonK(p.k)) }));
+  const parts = loose.map(p => ({ p, av: inModel ? p.qty : Math.min(p.qty, availFor(p.k, s.num)), eq: !inModel && !!EQ[p.part] && stock.some(x => x.part !== p.part && x.color == p.color && canonK(x.k) === canonK(p.k)) }));
   parts.sort((a, b) => ((a.av >= a.p.qty) - (b.av >= b.p.qty)) * (partSort === "miss" ? 1 : -1));
   box.innerHTML = `<div class="modal-header"><h3>${esc(s.name)}</h3><button class="icon-btn" data-d="close">✕</button></div>
     <div class="set-header"><img src="${esc(s.img)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt="">
-      <div class="grow"><div class="sub">Set N° ${esc(s.num)}${s.year ? " · " + esc(s.year) : ""}</div><div class="meta">${need} pièces · ${s.parts.length} références</div>
-      <div class="meta" style="color:${miss ? 'var(--warning)' : 'var(--success)'}">${wish ? "⭐ Envie · " : (c === "built" ? "🧱 Construit · " : "")}${miss ? plural(miss, "pièce") + " manquante" + (miss > 1 ? "s" : "") : "✓ Pièces au complet"}${s.reserved ? " · 🔒 réservé" : ""}</div></div></div>
+      <div class="grow"><div class="sub">Set N° ${esc(s.num)}${s.year ? " · " + esc(s.year) : ""}</div><div class="meta">${need} pièces · ${loose.length} références</div>
+      <div class="meta" style="color:${miss ? 'var(--warning)' : 'var(--success)'}">${wish ? "⭐ Envie · " : ""}${built ? "🧱 Construit" + (s.added ? " · pièces au stock" : "") : (miss ? plural(miss, "pièce") + " manquante" + (miss > 1 ? "s" : "") : "✓ Pièces au complet")}${s.reserved ? " · 🔒 réservé" : ""}</div></div></div>
     ${wish ? `<button class="btn pri full" style="margin-top:10px" data-d="tocol">⭐ Passer dans ma collection</button>` : `
     <div class="sub" style="margin:10px 0 4px">Catégorie (Auto = selon ton stock)</div>
     <div class="seg" style="margin:0 0 10px">${sts.map(([v, l]) => `<button data-st="${v}" class="${(s.manual || "auto") === v ? 'on' : ''}" style="font-size:11px">${l}</button>`).join("")}</div>`}
@@ -2122,16 +2203,25 @@ function renderDetail() {
       <a href="https://www.lego.com/fr-fr/service/buildinginstructions/${esc(clean)}" target="_blank" rel="noopener" class="btn pri sm full">📄 Notice PDF</a>
       <a href="https://rebrickable.com/sets/${esc(s.num)}" target="_blank" rel="noopener" class="btn sm full">🌐 Rebrickable</a>
     </div>
-    ${wish ? "" : `<button class="btn pri full" style="margin-top:8px" data-d="addall">📦 Ajouter toutes les pièces au stock</button>`}
-    ${c === "built" || wish ? "" : `<button class="btn full ${s.reserved ? '' : 'pri'}" style="margin-top:6px" data-d="res">${s.reserved ? "Libérer les pièces" : "🔒 Réserver les pièces"}</button>`}
+    ${wish ? "" : (built
+      ? (s.added ? `<button class="btn full" style="margin-top:8px" data-d="unstock">📤 Retirer ses pièces du stock (set monté)</button>` : `<button class="btn full" style="margin-top:8px" data-d="dismantle">🔧 Démonter : remettre les pièces au stock</button>`)
+      : `<button class="btn pri full" style="margin-top:8px" data-d="built">🧱 Marquer comme construit</button>
+         <button class="btn full" style="margin-top:6px" data-d="addall">📦 Ajouter toutes les pièces au stock</button>
+         <button class="btn full ${s.reserved ? '' : 'pri'}" style="margin-top:6px" data-d="res">${s.reserved ? "Libérer les pièces" : "🔒 Réserver les pièces"}</button>`)}
     ${miss ? `<button class="btn sm full" style="margin-top:6px" data-d="eq">🔁 Vérifier les pièces équivalentes</button>
     <button class="btn sm full" style="margin-top:6px" data-d="csv">📥 Exporter les manquants (CSV)</button>` : ""}
+    ${s.parts.some(p => !p.n) ? `<button class="btn sm full" style="margin-top:6px" data-d="refresh">🔄 Mettre à jour l'inventaire (noms, autocollants)</button>` : ""}
     <div class="seg" style="margin:12px 0 6px"><button data-sort="miss" class="${partSort === "miss" ? 'on' : ''}">Manquantes d'abord</button><button data-sort="done" class="${partSort === "done" ? 'on' : ''}">Complètes d'abord</button></div>
-    <div class="set-parts-grid">${parts.map(({ p, av, eq }) => `<div class="set-part-item" data-p="${esc(p.k)}" style="cursor:pointer">
+    <div class="set-parts-grid">${parts.map(({ p, av, eq }) => `<div class="set-part-item" ${inModel ? "" : `data-p="${esc(p.k)}" style="cursor:pointer"`}>
       <span class="badge-status ${av >= p.qty ? 'has' : (av > 0 ? 'missing' : '')}"${eq ? ' title="Complété avec une pièce équivalente"' : ""}>${av}/${p.qty}${eq ? " ≈" : ""}</span>
       ${pImg(p.part, p.color, p.i)}
       <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
       <div style="color:var(--text-muted); font-size:10px; margin-top:2px;">${esc(colName(p.color))}</div></div>`).join("")}</div>
+    ${stick.length ? `<div class="sub" style="margin:14px 0 6px">🏷 Autocollants (${stick.reduce((n, p) => n + p.qty, 0)})${built ? " · déjà posés" : ""}</div>
+    <div class="set-parts-grid">${stick.map(p => `<div class="set-part-item"><span class="badge-status ${built ? 'has' : ''}">${built ? "✓" : "×" + p.qty}</span>
+      ${goodImg(p.i) ? `<img src="${esc(p.i)}" alt="" referrerpolicy="no-referrer">` : pImg(p.part, p.color, "")}
+      <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
+      <div style="color:var(--text-muted); font-size:10px; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.n || "Autocollants")}</div></div>`).join("")}</div>` : ""}
     <button class="btn sm full" style="margin-top:14px" data-d="del">Retirer de la collection</button>`;
 }
 $("modal-set").onclick = e => {
@@ -2142,15 +2232,19 @@ $("modal-set").onclick = e => {
   if (pt) { const p = s.parts.find(x => x.k === pt.dataset.p); if (p) openQty({ k: p.k, part: p.part, color: p.color, name: p.n, img: p.i, need: p.qty, setNum: s.num }); return; }
   const so = e.target.closest("[data-sort]"); if (so) { partSort = so.dataset.sort; LSset("brickstock-psort", partSort); renderDetail(); return; }
   const st = e.target.closest("[data-st]");
-  if (st) { s.manual = st.dataset.st === "auto" ? null : st.dataset.st; saveSets(); renderCollection(); renderDetail(); return; }
+  if (st) { const v = st.dataset.st; if (v === "built") { if (!markBuilt(s)) return; } else s.manual = v === "auto" ? null : v; saveSets(); renderCollection(); renderDetail(); return; }
   const d = e.target.closest("[data-d]"); if (!d) return;
   const a = d.dataset.d;
   if (a === "close") { ov.classList.remove("open"); renderCollection(); return; }
   if (a === "addall") addAllToStock(s);
+  else if (a === "built") { if (!markBuilt(s)) return; }
+  else if (a === "dismantle") dismantle(s);
+  else if (a === "unstock") { consume(s); s.added = false; }
+  else if (a === "refresh") { refreshInv(s); return; }
   else if (a === "res") { if (s.reserved) s.reserved = false; else if (!tryReserve(s)) return; }
   else if (a === "eq") { runEquiv([s]); return; }
   else if (a === "tocol") { s.wish = false; colCat = "todo"; }
-  else if (a === "csv") { dl("manquants-set-" + s.num + ".csv", s.parts.filter(p => p.qty > availFor(p.k, s.num)).map(p => '"' + p.part + '",' + p.color + "," + (p.qty - availFor(p.k, s.num)))); return; }
+  else if (a === "csv") { dl("manquants-set-" + s.num + ".csv", s.parts.filter(p => !p.st && p.qty > availFor(p.k, s.num)).map(p => '"' + p.part + '",' + p.color + "," + (p.qty - availFor(p.k, s.num)))); return; }
   else if (a === "del") {
     if (!confirm("Retirer " + s.name + " de la collection ? (le stock n'est pas modifié)")) return;
     setsCol = setsCol.filter(x => x !== s); saveSets(); ov.classList.remove("open"); renderCollection(); return;
@@ -2173,6 +2267,7 @@ function renderPart() {
   const users = setsCol.filter(isCommitted).map(s => ({ s, q: (needsOf(s).find(n => n.k === canonK(it.k)) || { qty: 0 }).qty })).filter(x => x.q > 0);
   const res = users.reduce((n, x) => n + x.q, 0), free = Math.max(0, it.qty - res);
   const vars = stock.filter(x => x.part === it.part).sort((a, b) => b.qty - a.qty);
+  const inSets = setsCol.map(s => ({ s, q: (needsOf(s).find(n => n.k === canonK(it.k)) || { qty: 0 }).qty })).filter(x => x.q > 0);
   box.innerHTML = `<div class="modal-header"><h3>${esc(it.part)}</h3><button class="icon-btn" data-a="close">✕</button></div>
     <div class="set-header">${pImg(it.part, it.color, it.img)}<div class="grow"><div class="pn">${esc(it.name)}</div>
       <div class="meta"><span class="sw" style="background:${colRgb(it.color)}"></span>${esc(colName(it.color))}</div></div></div>
@@ -2183,17 +2278,33 @@ function renderPart() {
     ${res > it.qty ? '<div class="sub" style="color:var(--warning);margin-top:6px">⚠ Plus de pièces réservées que de pièces en stock</div>' : ""}
     ${users.map(x => `<div class="sub" style="margin-top:6px">${x.s.manual === "built" ? "🧱" : "🔒"} ${esc(x.s.name)} · ${x.q}</div>`).join("")}
     <button class="btn sm full" style="margin-top:10px" data-a="edit">✏️ Modifier la quantité</button>
+    <div class="sub" style="margin:14px 0 4px">Sets de ta collection avec cette pièce (${inSets.length})</div>
+    ${inSets.length ? inSets.map(x => `<div class="sub" data-os="${esc(x.s.num)}" style="padding:8px 0;border-bottom:1px solid var(--card-border);cursor:pointer;color:var(--text-main)">${x.s.wish ? "⭐" : (x.s.manual === "built" ? "🧱" : "▫️")} ${esc(x.s.name)} · ×${x.q} ›</div>`).join("") : '<div class="sub">Aucun pour l\'instant.</div>'}
+    <button class="btn sm full" style="margin-top:8px" data-a="allsets">🌐 Tous les sets LEGO avec cette pièce</button><div id="part-sets"></div>
     <div class="sub" style="margin:14px 0 6px">Couleurs en stock pour cette pièce (${vars.length})</div>
     <div class="vars">${vars.map(v => `<div class="var ${v.k === it.k ? 'on' : ''}" data-v="${esc(v.k)}">${pImg(v.part, v.color, v.img)}
       <div class="vn">${esc(colName(v.color))}</div><b>×${v.qty}</b></div>`).join("")}</div>`;
   const on = box.querySelector(".var.on"); if (on) on.scrollIntoView({ inline: "center", block: "nearest" });
 }
+async function loadPartSets(it) {
+  if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ⚙️ Paramètres");
+  const box = $("part-sets"); box.innerHTML = '<div class="sub" style="margin-top:6px">Chargement…</div>';
+  try {
+    const j = await rb("parts/" + encodeURIComponent(it.part) + "/colors/" + it.color + "/sets/?page_size=100");
+    partSetsList = (j.results || []).sort((a, b) => b.year - a.year).slice(0, 60);
+    box.innerHTML = partSetsList.length ? `<div class="sub" style="margin:8px 0 4px">${plural(j.count != null ? j.count : partSetsList.length, "set")} avec cette pièce dans cette couleur</div>` + partSetsList.map((x, i) => `<div class="sub" style="display:flex;align-items:center;gap:8px;color:var(--text-main);padding:4px 0"><span style="flex:1">${x.year} · ${esc(x.name)} (${esc(x.set_num)})</span><button class="btn sm" style="flex:none" data-w="${i}">⭐</button></div>`).join("") : '<div class="sub" style="margin-top:6px">Aucun set trouvé.</div>';
+  } catch(e) { box.innerHTML = '<div class="sub" style="margin-top:6px">Erreur : ' + esc(e.message) + '</div>'; }
+}
 $("modal-part").onclick = e => {
   if (e.target === $("modal-part")) { $("modal-part").classList.remove("open"); return; }
+  const os = e.target.closest("[data-os]"); if (os) { $("modal-part").classList.remove("open"); openSetDetail(os.dataset.os); return; }
+  const w = e.target.closest("[data-w]"); if (w) { const x = partSetsList[+w.dataset.w]; if (x) addSetToCollection(true, x); return; }
   const v = e.target.closest("[data-v]"); if (v) { partK = v.dataset.v; renderPart(); return; }
   const a = e.target.closest("[data-a]"); if (!a) return;
+  const it = stock.find(x => x.k === partK); if (!it) return;
   if (a.dataset.a === "close") $("modal-part").classList.remove("open");
-  else { const it = stock.find(x => x.k === partK); if (it) openQty({ k: it.k, part: it.part, color: it.color, name: it.name, img: it.img }); }
+  else if (a.dataset.a === "allsets") loadPartSets(it);
+  else openQty({ k: it.k, part: it.part, color: it.color, name: it.name, img: it.img });
 };
 
 function openQty(c) {
@@ -2249,7 +2360,7 @@ async function fetchEquivs(parts, onProg) {
 }
 async function runEquiv(sets) {
   if (eqBusy) return;
-  if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ☁ Configuration");
+  if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ⚙️ Paramètres");
   const rows = []; sets.forEach(s => needsOf(s).forEach(n => { if (n.qty > availFor(n.k, s.num)) rows.push(n.p.part); }));
   const before = sets.reduce((n, s) => n + setMissing(s), 0);
   eqBusy = true; showToast("Recherche des équivalences…");
@@ -2292,18 +2403,152 @@ $("modal-buy").onclick = e => {
   }
 };
 
+/* Minifigs : collection de figurines complètes */
+let figs = [], figRes = [], figSort = LS("bs_figsort") || "univ", themes = null, figOpen = null, partSetsList = [];
+try { figs = JSON.parse(localStorage.getItem("brickstock-figs") || "[]"); } catch(e) {}
+try { themes = JSON.parse(localStorage.getItem("brickstock-themes") || "null"); } catch(e) {}
+const saveFigs = () => { tStamp = Date.now(); LSset("bs_t", String(tStamp)); LSset("brickstock-figs", JSON.stringify(figs)); push(); };
+async function rb(path) {
+  const u = "https://rebrickable.com/api/v3/lego/" + path + (path.includes("?") ? "&" : "?") + "key=" + rbKey;
+  let r = await fetch(u); if (r.status === 429) { await sleep(2500); r = await fetch(u); }
+  if (!r.ok) throw new Error("HTTP " + r.status); return r.json();
+}
+async function loadThemes() {
+  if (themes) return;
+  const j = await rb("themes/?page_size=1000"); themes = {};
+  (j.results || []).forEach(t => { themes[t.id] = { n: t.name, p: t.parent_id }; });
+  LSset("brickstock-themes", JSON.stringify(themes));
+}
+const UMB = ["Super Heroes", "Licensed", "Miscellaneous"];
+function univOf(tid) {
+  if (!themes || !themes[tid]) return "Autre";
+  const path = []; let t = tid; while (t && themes[t]) { path.push(themes[t].n); t = themes[t].p; }
+  const root = path[path.length - 1], sub = path[path.length - 2] || root; return UMB.includes(root) ? sub : root;
+}
+async function addFig(r) {
+  const ex = figs.find(f => f.num === r.set_num);
+  if (ex) { ex.qty++; saveFigs(); renderFigs(); showToast("+1 " + ex.name); return; }
+  showToast("Ajout de la minifig…");
+  const f = { num: r.set_num, name: r.name, img: r.set_img_url, nparts: r.num_parts, qty: 1, added: Date.now(), univ: "Autre", year: 0, nsets: 0, sets: [], parts: null };
+  try {
+    await loadThemes();
+    const j = await rb("minifigs/" + r.set_num + "/sets/?page_size=100");
+    const L = (j.results || []).sort((a, b) => a.year - b.year);
+    f.nsets = j.count != null ? j.count : L.length; f.sets = L.slice(0, 6).map(x => ({ num: x.set_num, n: x.name, y: x.year }));
+    if (L[0]) { f.year = L[0].year; f.univ = univOf(L[0].theme_id); }
+  } catch(e) {}
+  figs.push(f); saveFigs(); renderFigs(); showToast("Minifig ajoutée ✓");
+}
+const figImg = u => `<img src="${esc(u || PH)}" onerror="this.onerror=null;this.src='${PH}'" alt="" referrerpolicy="no-referrer">`;
+function renderFigRes() {
+  $("fig-results").innerHTML = figRes.length ? `<div class="fgrid" style="margin-bottom:14px">${figRes.map((r, i) => `<div class="fcard">${figImg(r.set_img_url)}
+    <div class="fn">${esc(r.name)}</div><div class="fm">${esc(r.set_num)} · ${r.num_parts} pièces</div>
+    <button class="btn sm pri full" style="margin-top:6px" data-fa="${i}">➕ Ajouter</button></div>`).join("")}</div>` : "";
+}
+function renderFigs() {
+  const el = $("fig-coll"); if (!el) return;
+  if (!figs.length) { el.innerHTML = ""; return; }
+  const cmp = { univ: (a, b) => a.univ.localeCompare(b.univ) || a.name.localeCompare(b.name), year: (a, b) => b.year - a.year, yearasc: (a, b) => (a.year || 9999) - (b.year || 9999), added: (a, b) => b.added - a.added, alpha: (a, b) => a.name.localeCompare(b.name), rare: (a, b) => (a.nsets || 999) - (b.nsets || 999), parts: (a, b) => b.nparts - a.nparts }[figSort];
+  const L = figs.slice().sort(cmp), total = figs.reduce((n, f) => n + f.qty, 0);
+  const card = f => `<div class="fcard" data-fo="${esc(f.num)}">${figImg(f.img)}${f.qty > 1 ? `<span class="fq">×${f.qty}</span>` : ""}
+    <div class="fn">${esc(f.name)}</div><div class="fm">${esc(f.univ)} · ${f.year || "?"}${figSort === "rare" && f.nsets ? " · " + plural(f.nsets, "set") : ""}</div></div>`;
+  let body;
+  if (figSort === "univ") { const g = {}; L.forEach(f => (g[f.univ] = g[f.univ] || []).push(f)); body = Object.entries(g).map(([u, a]) => `<div class="fig-h">${esc(u)} · ${a.length}</div><div class="fgrid">${a.map(card).join("")}</div>`).join(""); }
+  else body = `<div class="fgrid">${L.map(card).join("")}</div>`;
+  const opts = [["univ", "Par univers"], ["year", "Date de sortie (récentes)"], ["yearasc", "Date de sortie (anciennes)"], ["added", "Date d'ajout"], ["alpha", "Personnage A → Z"], ["rare", "Rareté (peu de sets d'abord)"], ["parts", "Nombre de pièces"]];
+  el.innerHTML = `<div class="scan-results-title" style="margin:8px 0"><span>Mes minifigs · ${total} (${figs.length} différentes)</span></div>
+    <select id="fig-sort" style="margin-bottom:8px">${opts.map(([v, l]) => `<option value="${v}" ${figSort === v ? "selected" : ""}>${l}</option>`).join("")}</select>${body}`;
+}
+document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-fig"><div class="modal-card" id="modal-fig-card"></div></div>');
+function renderFigDetail() {
+  const f = figs.find(x => x.num === figOpen), box = $("modal-fig-card"); if (!f) return;
+  box.innerHTML = `<div class="modal-header"><h3>${esc(f.name)}</h3><button class="icon-btn" data-fd="close">✕</button></div>
+    <div class="set-header" style="align-items:flex-start">${figImg(f.img)}<div class="grow"><div class="sub">${esc(f.num)}</div>
+      <div class="meta">${esc(f.univ)} · ${f.year || "année inconnue"}</div><div class="meta">${f.nparts} pièces · présente dans ${plural(f.nsets, "set")}</div></div></div>
+    <div class="stepper" style="margin-top:12px"><button class="btn" data-fd="minus">−</button><div style="flex:1;text-align:center;font-size:18px;font-weight:700">×${f.qty}</div><button class="btn" data-fd="plus">+</button></div>
+    ${f.sets.length ? `<div class="sub" style="margin:12px 0 4px">Sets où elle apparaît${f.nsets > f.sets.length ? " (les plus anciens)" : ""}</div>${f.sets.map(x => `<div class="sub" style="color:var(--text-main)">${x.y} · ${esc(x.n)} (${esc(x.num)})</div>`).join("")}` : ""}
+    <div class="set-actions" style="margin-top:10px"><a class="btn sm full" target="_blank" rel="noopener" href="https://rebrickable.com/minifigs/${esc(f.num)}/">🌐 Rebrickable</a>
+      <a class="btn sm full" target="_blank" rel="noopener" href="https://www.bricklink.com/v2/search.page?q=${encodeURIComponent(f.name)}">💰 Prix BrickLink</a></div>
+    <div class="sub" style="margin:14px 0 6px">Pièces de la figurine${f.parts ? " (" + f.parts.length + ")" : ""}</div>
+    ${f.parts ? `<div class="set-parts-grid">${f.parts.map(p => `<div class="set-part-item"><span class="badge-status">×${p.qty}</span>${pImg(p.part, p.color, p.i)}
+      <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
+      <div style="color:var(--text-muted); font-size:10px; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.n)}</div></div>`).join("")}</div>` : '<div class="sub">Chargement…</div>'}
+    <button class="btn sm full" style="margin-top:14px" data-fd="del">Retirer de mes minifigs</button>`;
+}
+async function openFig(num) {
+  figOpen = num; renderFigDetail(); $("modal-fig").classList.add("open");
+  const f = figs.find(x => x.num === num);
+  if (f && !f.parts && rbKey) {
+    try { const j = await rb("minifigs/" + num + "/parts/?page_size=100");
+      f.parts = (j.results || []).filter(p => !p.is_spare).map(p => ({ part: p.part.part_num, color: p.color.id, n: p.part.name, i: goodImg(p.part.part_img_url), qty: p.quantity }));
+      saveFigs(); if (figOpen === num) renderFigDetail(); } catch(e) {}
+  }
+}
+$("fig-go").onclick = async () => {
+  const q = $("fig-q").value.trim(); if (!q) return;
+  if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ⚙️ Paramètres");
+  $("fig-status").textContent = "Recherche…";
+  try { figRes = (await rb("minifigs/?search=" + encodeURIComponent(q) + "&page_size=30")).results || [];
+    $("fig-status").textContent = figRes.length ? plural(figRes.length, "résultat") : "Aucune minifig trouvée"; renderFigRes();
+  } catch(e) { $("fig-status").textContent = "Erreur : " + e.message; }
+};
+$("fig-q").onkeydown = e => { if (e.key === "Enter") $("fig-go").click(); };
+$("s-figs").onclick = e => {
+  const a = e.target.closest("[data-fa]"); if (a) { addFig(figRes[+a.dataset.fa]); triggerHaptic(); return; }
+  const o = e.target.closest("[data-fo]"); if (o) openFig(o.dataset.fo);
+};
+$("s-figs").onchange = e => { if (e.target.id === "fig-sort") { figSort = e.target.value; LSset("bs_figsort", figSort); renderFigs(); } };
+$("modal-fig").onclick = e => {
+  const ov = $("modal-fig"); if (e.target === ov) { ov.classList.remove("open"); return; }
+  const d = e.target.closest("[data-fd]"); if (!d) return;
+  const f = figs.find(x => x.num === figOpen); if (!f) return; const a = d.dataset.fd;
+  if (a === "close") { ov.classList.remove("open"); return; }
+  if (a === "plus") f.qty++; else if (a === "minus") f.qty = Math.max(1, f.qty - 1);
+  else if (a === "del") { if (!confirm("Retirer " + f.name + " de tes minifigs ?")) return; figs = figs.filter(x => x !== f); saveFigs(); ov.classList.remove("open"); renderFigs(); return; }
+  saveFigs(); renderFigDetail(); renderFigs();
+};
+renderFigs();
+
+/* Notices de tous les sets */
+document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-nt"><div class="modal-card" id="modal-nt-card"></div></div>');
+function renderNotices() {
+  $("modal-nt-card").innerHTML = `<div class="modal-header"><h3>📚 Notices de mes sets</h3><button class="icon-btn" data-n="close">✕</button></div>
+    ${setsCol.map(s => { const c = String(s.num).split("-")[0]; return `<div class="set-card"><div class="pn">${esc(s.name)}</div><div class="sub">Set N° ${esc(s.num)}</div>
+      <div class="set-actions" style="margin-top:6px"><a class="btn pri sm full" target="_blank" rel="noopener" href="https://www.lego.com/fr-fr/service/buildinginstructions/${esc(c)}">📄 LEGO</a>
+      <a class="btn sm full" target="_blank" rel="noopener" href="https://brickset.com/sets/${esc(s.num)}">Brickset</a></div></div>`; }).join("") || '<div class="empty">Aucun set.</div>'}
+    <div class="sub" style="margin-top:8px">Pour les très anciens sets, Brickset renvoie souvent vers des scans de notices.</div>`;
+}
+$("modal-nt").onclick = e => { if (e.target === $("modal-nt") || e.target.closest("[data-n]")) $("modal-nt").classList.remove("open"); };
+
+/* Vider le stock (avec sauvegarde et annulation) */
+document.body.insertAdjacentHTML("beforeend", '<div id="undo-bar"><span>Stock vidé</span><button id="undo-btn">Annuler</button></div>');
+let undoSnap = null, undoT = null;
+$("btn-clear-stock").onclick = () => {
+  if (!stock.length) return showToast("Le stock est déjà vide");
+  if (!confirm("Vider tout le stock (" + stock.length + " références) ?\nUne sauvegarde sera téléchargée avant, et tu pourras annuler pendant 10 secondes.")) return;
+  $("bk-export").onclick();
+  undoSnap = JSON.parse(JSON.stringify(stock)); stock = []; _T = null; save(); render(); renderCollection();
+  $("modal-sync").classList.remove("open");
+  $("undo-bar").classList.add("show"); clearTimeout(undoT); undoT = setTimeout(() => $("undo-bar").classList.remove("show"), 10000);
+};
+$("undo-btn").onclick = () => {
+  if (!undoSnap) return; stock = undoSnap; undoSnap = null; _T = null; save(); render(); renderCollection();
+  $("undo-bar").classList.remove("show"); showToast("Stock restauré ✓");
+};
+
 /* Sauvegarde complète + synchro de la collection */
-window.__extra = () => ({ sets: setsCol, equiv: EQC });
+window.__extra = () => ({ sets: setsCol, equiv: EQC, figs });
 window.__applyExtra = j => {
   if (Array.isArray(j.sets)) { setsCol = j.sets.map(normSet); LSset("brickstock-sets", JSON.stringify(setsCol)); }
   if (j.equiv) { EQC = j.equiv; LSset("brickstock-equiv", JSON.stringify(EQC)); buildEq(); }
+  if (Array.isArray(j.figs)) { figs = j.figs; LSset("brickstock-figs", JSON.stringify(figs)); renderFigs(); }
   _T = null; renderCollection();
 };
 const bkInfo = () => { const t = LS("brickstock-lastbackup"); $("bk-info").textContent = t ? "Dernière sauvegarde : " + new Date(+t).toLocaleDateString("fr-FR") : "Aucune sauvegarde faite sur cet appareil"; };
 bkInfo();
 $("bk-export").onclick = () => {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: "BrickStock", v: 2, savedAt: new Date().toISOString(), stock, sets: setsCol, equiv: EQC })], { type: "application/json" }));
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: "BrickStock", v: 2, savedAt: new Date().toISOString(), stock, sets: setsCol, equiv: EQC, figs })], { type: "application/json" }));
   a.download = "brickstock-sauvegarde-" + new Date().toISOString().slice(0, 10) + ".json";
   document.body.appendChild(a); a.click(); a.remove();
   LSset("brickstock-lastbackup", String(Date.now())); bkInfo(); showToast("Sauvegarde exportée ✓");
@@ -2315,12 +2560,12 @@ $("bk-file").onchange = async e => {
     const j = JSON.parse(await f.text());
     if (!Array.isArray(j.stock)) throw new Error("fichier non reconnu");
     if (!confirm("Remplacer ton stock (" + stock.length + " réf.) et ta collection (" + setsCol.length + " sets) par la sauvegarde (" + j.stock.length + " réf., " + (j.sets || []).length + " sets) ?")) return;
-    stock = fixColors(j.stock); setsCol = (j.sets || []).map(normSet);
+    stock = fixColors(j.stock); setsCol = (j.sets || []).map(normSet); figs = Array.isArray(j.figs) ? j.figs : []; LSset("brickstock-figs", JSON.stringify(figs)); renderFigs();
     if (j.equiv) { EQC = j.equiv; LSset("brickstock-equiv", JSON.stringify(EQC)); buildEq(); }
     save(); saveSets(); render(); renderCollection(); showToast("Sauvegarde importée ✓");
   } catch(err) { showToast("Import impossible : " + err.message); }
 };
-if ((stock.length || setsCol.length) && !LS("bs_gid") && Date.now() - (+LS("brickstock-lastbackup") || 0) > 30 * 864e5) setTimeout(() => showToast("Pense à exporter une sauvegarde (☁ en haut à droite)"), 3000);
+if ((stock.length || setsCol.length) && !LS("bs_gid") && Date.now() - (+LS("brickstock-lastbackup") || 0) > 30 * 864e5) setTimeout(() => showToast("Pense à exporter une sauvegarde (⚙️ en haut à droite)"), 3000);
 
 /* Scan : seule la liste des propositions peut défiler */
 document.addEventListener("touchmove", e => {
