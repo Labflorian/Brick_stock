@@ -673,6 +673,18 @@ img.generic { filter: grayscale(1); opacity: .7; }
 .seg { display: flex; gap: 6px; margin: 8px 0; }
 .seg button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-main); font-size: 12px; font-weight: 600; cursor: pointer; }
 .seg button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.stats { display: flex; gap: 8px; }
+.stat { flex: 1; text-align: center; padding: 10px 4px; border: 1px solid var(--card-border); border-radius: 12px; }
+.stat b { display: block; font-size: 22px; }
+.stat span { font-size: 11px; color: var(--text-muted); }
+.vars { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 6px; touch-action: pan-x; }
+.var { flex: none; width: 88px; scroll-snap-align: center; text-align: center; padding: 8px 4px; border: 1px solid var(--card-border); border-radius: 12px; font-size: 11px; cursor: pointer; }
+.var.on { border-color: var(--primary); outline: 2px solid var(--primary); }
+.var img { width: 52px; height: 52px; object-fit: contain; background: #fff; border-radius: 8px; padding: 2px; }
+.var .vn { margin-top: 4px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stepper { display: flex; gap: 8px; align-items: center; }
+.stepper input { flex: 1; min-width: 0; text-align: center; font-size: 20px; font-weight: 700; }
+.stepper .btn { flex: none; width: 52px; font-size: 22px; }
 </style>
 </head>
 <body>
@@ -1497,7 +1509,7 @@ function render() {
     return;
   }
 
-  $("list").innerHTML = rows.map(x => `<div class="card">
+  $("list").innerHTML = rows.map(x => `<div class="card" data-pk="${esc(x.k)}" style="cursor:pointer">
     ${imgTag(x)}
     <div class="grow">
       <div class="pn">${esc(x.part)}</div>
@@ -1515,7 +1527,8 @@ function render() {
 }
 
 $("list").onclick = e => {
-  const b = e.target.closest("button[data-k]"); if(!b) return;
+  const b = e.target.closest("button[data-k]");
+  if(!b) { const c = e.target.closest("[data-pk]"); if(c && window.openPart) openPart(c.dataset.pk); return; }
   const it = stock.find(x => x.k == b.dataset.k); if(!it) return;
   it.qty += +b.dataset.d;
   if(it.qty <= 0) stock = stock.filter(x => x !== it);
@@ -1993,7 +2006,7 @@ function addAllToStock(s) {
   s.parts.forEach(p => {
     const it = stock.find(x => x.k === p.k);
     if (it) it.qty += p.qty;
-    else stock.push({ k: p.k, part: p.part, name: p.n || p.part, img: p.i || "", color: p.color, qty: p.qty, addedAt: Date.now(), cv: 2 });
+    else stock.push({ k: p.k, part: p.part, name: p.n || p.part, img: goodImg(p.i), color: p.color, qty: p.qty, addedAt: Date.now(), cv: 2 });
   });
   s.added = true; s.manual = "built"; s.reserved = false;
   save(); render(); saveSets();
@@ -2009,7 +2022,7 @@ async function addSetToCollection() {
     const r = await fetch("https://rebrickable.com/api/v3/lego/sets/" + d.set_num + "/parts/?page_size=1000&key=" + rbKey);
     if (!r.ok) throw new Error("HTTP " + r.status);
     const j = await r.json();
-    const parts = aggParts((j.results || []).filter(p => !p.is_spare).map(p => ({ k: p.part.part_num + "|" + p.color.id, part: p.part.part_num, color: p.color.id, n: p.part.name, i: p.part.part_img_url, qty: p.quantity })));
+    const parts = aggParts((j.results || []).filter(p => !p.is_spare).map(p => ({ k: p.part.part_num + "|" + p.color.id, part: p.part.part_num, color: p.color.id, n: p.part.name, i: goodImg(p.part.part_img_url), qty: p.quantity })));
     setsCol.push({ num: d.set_num, name: d.name, img: d.set_img_url, year: d.year || "", manual: null, added: false, reserved: false, parts });
     saveSets(); renderCollection(); openSetDetail(d.set_num);
   } catch(e) { showToast("Erreur : " + e.message); }
@@ -2080,9 +2093,9 @@ function renderDetail() {
     <button class="btn pri full" style="margin-top:8px" data-d="addall">📦 Ajouter toutes les pièces au stock</button>
     ${c === "built" ? "" : `<button class="btn full ${s.reserved ? '' : 'pri'}" style="margin-top:6px" data-d="res">${s.reserved ? "Libérer les pièces" : "🔒 Réserver les pièces"}</button>`}
     ${miss ? '<button class="btn sm full" style="margin-top:6px" data-d="csv">📥 Exporter les manquants (CSV)</button>' : ""}
-    <div class="set-parts-grid" style="margin-top:12px">${parts.map(({ p, av }) => `<div class="set-part-item">
+    <div class="set-parts-grid" style="margin-top:12px">${parts.map(({ p, av }) => `<div class="set-part-item" data-p="${esc(p.k)}" style="cursor:pointer">
       <span class="badge-status ${av >= p.qty ? 'has' : (av > 0 ? 'missing' : '')}">${av}/${p.qty}</span>
-      <img src="${esc(p.i || 'https://cdn.rebrickable.com/media/parts/ldraw/' + p.color + '/' + p.part + '.png')}" onerror="this.onerror=null;this.style.opacity=.2" alt="">
+      ${pImg(p.part, p.color, p.i)}
       <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
       <div style="color:var(--text-muted); font-size:10px; margin-top:2px;">${esc(colName(p.color))}</div></div>`).join("")}</div>
     <button class="btn sm full" style="margin-top:14px" data-d="del">Retirer de la collection</button>`;
@@ -2090,6 +2103,8 @@ function renderDetail() {
 $("modal-set").onclick = e => {
   if (e.target === $("modal-set")) { $("modal-set").classList.remove("open"); renderCollection(); return; }
   const s = findSet(openNum); if (!s) return;
+  const pt = e.target.closest("[data-p]");
+  if (pt) { const p = s.parts.find(x => x.k === pt.dataset.p); if (p) openQty({ k: p.k, part: p.part, color: p.color, name: p.n, img: p.i, need: p.qty, setNum: s.num }); return; }
   const st = e.target.closest("[data-st]");
   if (st) { s.manual = st.dataset.st === "auto" ? null : st.dataset.st; saveSets(); renderCollection(); renderDetail(); return; }
   const d = e.target.closest("[data-d]"); if (!d) return;
@@ -2105,6 +2120,76 @@ $("modal-set").onclick = e => {
   saveSets(); renderCollection(); renderDetail(); triggerHaptic();
 };
 renderCollection();
+
+/* Fiche pièce du stock + saisie manuelle de quantité */
+const PH = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><g fill="#8b93a1"><rect x="4" y="18" width="40" height="22" rx="3"/><circle cx="14" cy="13" r="4"/><circle cx="24" cy="13" r="4"/><circle cx="34" cy="13" r="4"/></g></svg>');
+const goodImg = u => (u && !/nopic|no_image/i.test(u)) ? u : "";
+const pImg = (part, color, hint) => imgTag({ part, color, img: goodImg(hint) || PH });
+document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-part"><div class="modal-card" id="modal-part-card"></div></div><div class="modal-overlay" id="modal-qty" style="z-index:120"><div class="modal-card" id="modal-qty-card"></div></div>');
+let partK = null, qtyCtx = null;
+
+function openPart(k) { partK = k; renderPart(); $("modal-part").classList.add("open"); }
+function renderPart() {
+  const it = stock.find(x => x.k === partK), box = $("modal-part-card");
+  if (!it) { $("modal-part").classList.remove("open"); return; }
+  const users = setsCol.filter(isCommitted).map(s => ({ s, q: (s.parts.find(x => x.k === it.k) || { qty: 0 }).qty })).filter(x => x.q > 0);
+  const res = users.reduce((n, x) => n + x.q, 0), free = Math.max(0, it.qty - res);
+  const vars = stock.filter(x => x.part === it.part).sort((a, b) => b.qty - a.qty);
+  box.innerHTML = `<div class="modal-header"><h3>${esc(it.part)}</h3><button class="icon-btn" data-a="close">✕</button></div>
+    <div class="set-header">${pImg(it.part, it.color, it.img)}<div class="grow"><div class="pn">${esc(it.name)}</div>
+      <div class="meta"><span class="sw" style="background:${colRgb(it.color)}"></span>${esc(colName(it.color))}</div></div></div>
+    <div class="stats" style="margin-top:12px">
+      <div class="stat"><b>${it.qty}</b><span>En stock</span></div>
+      <div class="stat"><b>${res}</b><span>Réservées</span></div>
+      <div class="stat"><b style="color:${free ? 'var(--success)' : 'var(--warning)'}">${free}</b><span>Libres</span></div></div>
+    ${res > it.qty ? '<div class="sub" style="color:var(--warning);margin-top:6px">⚠ Plus de pièces réservées que de pièces en stock</div>' : ""}
+    ${users.map(x => `<div class="sub" style="margin-top:6px">${x.s.manual === "built" ? "🧱" : "🔒"} ${esc(x.s.name)} · ${x.q}</div>`).join("")}
+    <button class="btn sm full" style="margin-top:10px" data-a="edit">✏️ Modifier la quantité</button>
+    <div class="sub" style="margin:14px 0 6px">Couleurs en stock pour cette pièce (${vars.length})</div>
+    <div class="vars">${vars.map(v => `<div class="var ${v.k === it.k ? 'on' : ''}" data-v="${esc(v.k)}">${pImg(v.part, v.color, v.img)}
+      <div class="vn">${esc(colName(v.color))}</div><b>×${v.qty}</b></div>`).join("")}</div>`;
+  const on = box.querySelector(".var.on"); if (on) on.scrollIntoView({ inline: "center", block: "nearest" });
+}
+$("modal-part").onclick = e => {
+  if (e.target === $("modal-part")) { $("modal-part").classList.remove("open"); return; }
+  const v = e.target.closest("[data-v]"); if (v) { partK = v.dataset.v; renderPart(); return; }
+  const a = e.target.closest("[data-a]"); if (!a) return;
+  if (a.dataset.a === "close") $("modal-part").classList.remove("open");
+  else { const it = stock.find(x => x.k === partK); if (it) openQty({ k: it.k, part: it.part, color: it.color, name: it.name, img: it.img }); }
+};
+
+function openQty(c) {
+  const it = stock.find(x => x.k === c.k), cur = it ? it.qty : 0, others = committedQty(c.k, c.setNum);
+  const miss = c.need ? Math.max(0, c.need - Math.max(0, cur - others)) : 0;
+  qtyCtx = { ...c, cur, miss };
+  $("modal-qty-card").innerHTML = `<div class="modal-header"><h3>${esc(c.part)} · ${esc(colName(c.color))}</h3><button class="icon-btn" data-q="close">✕</button></div>
+    <div class="set-header">${pImg(c.part, c.color, c.img)}<div class="grow"><div class="sub">${esc(c.name || "")}</div>
+      ${c.need ? `<div class="meta">Besoin pour ce set : ${c.need}</div>` : ""}
+      <div class="meta">En stock : ${cur}${others ? " · réservées par d'autres sets : " + others : ""}</div></div></div>
+    <div class="sub" style="margin:12px 0 4px">Quantité que tu possèdes (total en stock)</div>
+    <div class="stepper"><button class="btn" data-q="-">−</button><input id="qty-in" type="number" inputmode="numeric" min="0" value="${cur}"><button class="btn" data-q="+">+</button></div>
+    ${miss ? `<button class="btn pri full" style="margin-top:8px" data-q="fill">J'ai tout : ajouter ${miss} pour compléter</button>` : ""}
+    <button class="btn ${miss ? '' : 'pri'} full" style="margin-top:8px" data-q="save">Enregistrer</button>`;
+  $("modal-qty").classList.add("open");
+}
+function saveQty(v) {
+  const c = qtyCtx, it = stock.find(x => x.k === c.k);
+  if (v <= 0) { if (it) stock = stock.filter(x => x !== it); }
+  else if (it) it.qty = v;
+  else stock.push({ k: c.k, part: c.part, name: c.name || c.part, img: goodImg(c.img), color: c.color, qty: v, addedAt: Date.now(), cv: 2 });
+  save(); render(); renderCollection(); renderDetail(); renderPart();
+  $("modal-qty").classList.remove("open"); triggerHaptic(); showToast("Stock mis à jour : " + v + " × " + c.part);
+}
+$("modal-qty").onclick = e => {
+  if (e.target === $("modal-qty")) { $("modal-qty").classList.remove("open"); return; }
+  const q = e.target.closest("[data-q]"); if (!q) return;
+  const inp = $("qty-in"), a = q.dataset.q;
+  if (a === "close") $("modal-qty").classList.remove("open");
+  else if (a === "-") inp.value = Math.max(0, (+inp.value || 0) - 1);
+  else if (a === "+") inp.value = (+inp.value || 0) + 1;
+  else if (a === "fill") saveQty(qtyCtx.cur + qtyCtx.miss);
+  else saveQty(Math.max(0, Math.floor(+inp.value || 0)));
+};
 
 /* Scan : seule la liste des propositions peut défiler */
 document.addEventListener("touchmove", e => {
