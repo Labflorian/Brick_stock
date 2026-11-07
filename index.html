@@ -377,9 +377,9 @@ input:focus, select:focus { border-color: var(--primary); }
   height: calc(100vh - var(--hdr-h, 56px) - var(--nav-h, 62px));
   height: calc(100dvh - var(--hdr-h, 56px) - var(--nav-h, 62px));
 }
-body.scan-mode { height: 100dvh; overflow: hidden; }
+body.scan-mode { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; overflow: hidden; }
 body.scan-mode main { overflow: hidden; padding-bottom: 0; }
-#s-scan.on { display: flex; }
+#s-scan.on { display: flex; position: fixed; left: 0; right: 0; margin: 0 auto; max-width: 600px; top: var(--hdr-h, 56px); bottom: var(--nav-h, 62px); height: auto; z-index: 5; }
 
 .vw-container {
   position: relative;
@@ -780,6 +780,7 @@ img.generic { filter: grayscale(1); opacity: .7; }
     <div id="set-status" class="sub" style="margin-bottom: 10px; text-align: center;">Entrez un numéro de set LEGO pour afficher la notice et la liste des pièces.</div>
 
     <div id="set-results"></div>
+    <div id="set-collection"></div>
   </section>
 
   <!-- SCAN TAB -->
@@ -1424,6 +1425,7 @@ function tab(n) {
     });
 
     document.body.classList.toggle("scan-mode", n === "scan"); if (window.setBars) setBars();
+    if (n === "sets" && window.renderCollection) renderCollection();
     if (n === "scan") {
       if (!stream) startCam();
       else v.play().catch(() => {});
@@ -1558,7 +1560,7 @@ async function searchSet() {
     } catch(e){}
   }
 
-  statusEl.textContent = "Résultat trouvé pour le set " + setNum;
+  currentSetData = setData; statusEl.textContent = "Résultat trouvé pour le set " + setNum;
 
   resEl.innerHTML = `<div class="set-card">
     <div class="set-header">
@@ -1574,10 +1576,12 @@ async function searchSet() {
       <a href="${rebrickableUrl}" target="_blank" rel="noopener" class="btn sm full">🌐 Page Rebrickable</a>
     </div>
     <button class="btn sm full" id="btn-load-parts" style="margin-top:4px;">📦 Charger & comparer l'inventaire des pièces</button>
+    <button class="btn sm pri full" id="btn-add-col" style="margin-top:4px;">➕ Ajouter à ma collection</button>
     <div id="set-parts-container"></div>
   </div>`;
 
   $("btn-load-parts").onclick = () => fetchSetParts(setNum);
+  $("btn-add-col").onclick = addSetToCollection;
 }
 
 async function fetchSetParts(setNum) {
@@ -1948,6 +1952,87 @@ if(gid) { showCode(); pull(); }
   };
   window.addEventListener("resize", setBars); setBars();
 })();
+</script>
+<script>
+/* Collection de sets + réservation de pièces */
+let currentSetData = null, setsCol = [];
+try { setsCol = JSON.parse(localStorage.getItem("brickstock-sets") || "[]"); } catch(e) {}
+const saveSets = () => LSset("brickstock-sets", JSON.stringify(setsCol));
+const stockQty = k => { const it = stock.find(x => x.k === k); return it ? it.qty : 0; };
+const reservedQty = (k, exceptNum) => setsCol.reduce((n, s) => {
+  if (!s.reserved || s.num === exceptNum) return n;
+  const p = s.parts.find(x => x.k === k); return n + (p ? p.qty : 0);
+}, 0);
+const availFor = (k, exceptNum) => Math.max(0, stockQty(k) - reservedQty(k, exceptNum));
+const setMissing = s => s.parts.reduce((n, p) => n + Math.max(0, p.qty - availFor(p.k, s.num)), 0);
+
+async function addSetToCollection() {
+  const d = currentSetData; if (!d) return;
+  if (setsCol.find(x => x.num === d.set_num)) return showToast("Ce set est déjà dans ta collection");
+  if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ☁ Configuration");
+  showToast("Chargement de l'inventaire…");
+  try {
+    const r = await fetch("https://rebrickable.com/api/v3/lego/sets/" + d.set_num + "/parts/?page_size=1000&key=" + rbKey);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    const parts = (j.results || []).filter(p => !p.is_spare).map(p => ({ k: p.part.part_num + "|" + p.color.id, part: p.part.part_num, color: p.color.id, qty: p.quantity }));
+    setsCol.push({ num: d.set_num, name: d.name, img: d.set_img_url, parts, reserved: false });
+    saveSets(); renderCollection(); showToast("Set ajouté à ta collection ✓");
+  } catch(e) { showToast("Erreur : " + e.message); }
+}
+
+function renderCollection() {
+  const el = $("set-collection"); if (!el) return;
+  if (!setsCol.length) { el.innerHTML = ""; return; }
+  const tot = {};
+  setsCol.forEach(s => s.parts.forEach(p => { (tot[p.k] = tot[p.k] || { part: p.part, color: p.color, qty: 0 }).qty += p.qty; }));
+  let needAll = 0, missAll = 0;
+  Object.entries(tot).forEach(([k, p]) => { needAll += p.qty; missAll += Math.max(0, p.qty - stockQty(k)); });
+  const cards = setsCol.map(s => {
+    const need = s.parts.reduce((n, p) => n + p.qty, 0), miss = setMissing(s);
+    const pct = need ? Math.round((need - miss) / need * 100) : 0;
+    const col = miss === 0 ? "var(--success)" : (pct > 50 ? "var(--warning)" : "var(--primary)");
+    const status = s.reserved ? "🔒 Pièces réservées" : (miss === 0 ? "✓ Tu as toutes les pièces" : miss + " pièce" + (miss > 1 ? "s" : "") + " manquante" + (miss > 1 ? "s" : "") + " (" + pct + "%)");
+    return `<div class="set-card">
+      <div class="set-header">
+        <img src="${esc(s.img)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt="">
+        <div class="grow"><div class="pn">${esc(s.name)}</div><div class="sub">Set N° ${esc(s.num)} · ${need} pièces</div><div class="meta" style="color:${col}">${status}</div></div>
+      </div>
+      <div class="progress-container"><div class="progress-bar" style="width:${pct}%; background:${col};"></div></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn sm ${s.reserved ? '' : 'pri'}" data-act="res" data-num="${esc(s.num)}">${s.reserved ? "Libérer les pièces" : "Réserver les pièces"}</button>
+        <button class="btn sm" style="flex:none" data-act="del" data-num="${esc(s.num)}">Retirer</button>
+      </div>
+    </div>`;
+  }).join("");
+  el.innerHTML = `<div class="scan-results-title" style="margin:16px 0 6px"><span>Ma collection · ${setsCol.length} set${setsCol.length > 1 ? "s" : ""}</span></div>
+    <div class="set-card">
+      <div class="pn">Tous les sets ensemble</div>
+      <div class="meta" style="color:${missAll ? 'var(--warning)' : 'var(--success)'}">${missAll ? missAll + " pièces manquantes sur " + needAll : "Ton stock couvre tous les sets (" + needAll + " pièces)"}</div>
+      <button class="btn sm full" id="exp-col-missing" style="margin-top:6px">📥 Exporter les manquants de la collection (CSV)</button>
+    </div>${cards}`;
+  $("exp-col-missing").onclick = () => {
+    const rows = Object.values(tot).map(p => ({ p, m: p.qty - stockQty(p.part + "|" + p.color) })).filter(x => x.m > 0).map(x => '"' + x.p.part + '",' + x.p.color + "," + x.m);
+    if (!rows.length) return showToast("Rien à exporter : tu as tout !");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["Part,Color,Quantity\n" + rows.join("\n") + "\n"], { type: "text/csv" }));
+    a.download = "manquants-collection.csv"; document.body.appendChild(a); a.click(); a.remove();
+  };
+}
+$("set-collection").onclick = e => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const s = setsCol.find(x => x.num === b.dataset.num); if (!s) return;
+  if (b.dataset.act === "del") { if (!confirm("Retirer " + s.name + " de la collection ?")) return; setsCol = setsCol.filter(x => x !== s); }
+  else if (s.reserved) s.reserved = false;
+  else { const m = setMissing(s); if (m) return showToast("Il manque " + m + " pièce" + (m > 1 ? "s" : "") + " pour ce set"); s.reserved = true; }
+  saveSets(); renderCollection(); triggerHaptic();
+};
+renderCollection();
+
+/* Scan : seule la liste des propositions peut défiler */
+document.addEventListener("touchmove", e => {
+  if (document.body.classList.contains("scan-mode") && !e.target.closest(".cand-grid, .modal-overlay")) e.preventDefault();
+}, { passive: false });
 </script>
 </body>
 </html>
