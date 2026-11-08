@@ -707,6 +707,20 @@ img.generic { filter: grayscale(1); opacity: .7; }
 #undo-bar { display: none; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--nav-h, 62px) + 12px); z-index: 300; align-items: center; gap: 12px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 8px 8px 8px 16px; font-size: 13px; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
 #undo-bar.show { display: flex; }
 #undo-bar button { border: 0; border-radius: 14px; padding: 7px 14px; background: var(--primary); color: #fff; font-weight: 700; }
+.sg-row { display: flex; gap: 10px; align-items: center; padding: 8px; border-bottom: 1px solid var(--card-border); cursor: pointer; }
+.sg-row img { width: 44px; height: 44px; object-fit: contain; background: #fff; border-radius: 8px; flex: none; }
+.sg-row .pn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#set-sugg { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 8px; overflow: hidden; }
+#set-sugg:empty { display: none; }
+#scan-zone { position: absolute; border: 1.5px dashed rgba(255,255,255,.8); border-radius: 10px; pointer-events: none; z-index: 9; display: none; }
+.modal-overlay { overflow-x: hidden; touch-action: pan-y; }
+.modal-card { max-width: 100%; box-sizing: border-box; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; overflow-wrap: anywhere; }
+.modal-card > * { max-width: 100%; }
+.modal-card input, .modal-card select, .modal-card textarea, .modal-card .btn { max-width: 100%; min-width: 0; box-sizing: border-box; }
+.modal-card .row { flex-wrap: wrap; }
+.seg button { min-width: 0; }
+.modal-card .seg { flex-wrap: wrap; }
+.modal-card .seg button { flex: 1 1 22%; }
 </style>
 </head>
 <body>
@@ -742,6 +756,8 @@ img.generic { filter: grayscale(1); opacity: .7; }
     <div class="sub">Gros boutons</div>
     <div class="seg" id="ap-btn"><button data-v="soft">Discrets</button><button data-v="solid">Pleins</button></div>
     <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0 4px"><input type="checkbox" id="ap-hap"> Vibration au toucher</label>
+    <div class="sub" style="margin-top:6px">Zone de scan autour de la cible</div>
+    <div class="seg" id="ap-zone"><button data-v="narrow">Étroite</button><button data-v="normal">Normale</button><button data-v="wide">Large</button></div>
 
     <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 12px 0;">
 
@@ -832,6 +848,7 @@ img.generic { filter: grayscale(1); opacity: .7; }
       <button class="btn pri" id="btn-search-set" style="flex: none;">Rechercher</button>
     </div>
 
+    <div id="set-sugg"></div>
     <div id="set-status" class="sub" style="margin-bottom: 10px; text-align: center;">Entrez un numéro de set LEGO pour afficher la notice et la liste des pièces.</div>
 
     <div id="set-results"></div>
@@ -839,9 +856,12 @@ img.generic { filter: grayscale(1); opacity: .7; }
   </section>
 
   <section id="s-figs">
-    <div class="row"><input id="fig-q" type="search" placeholder="Chercher une minifig (ex: Spider-Man, Kai)…"><button class="btn pri" id="fig-go" style="flex: none;">Chercher</button></div>
-    <div id="fig-status" class="sub" style="margin-bottom: 10px; text-align: center;">Cherche une minifigurine complète pour l'ajouter à ta collection.</div>
-    <div id="fig-results"></div>
+    <div class="seg" id="fig-mode"><button data-fm="coll"><span>Ma collection</span><b id="fig-cnt">0</b></button><button data-fm="search"><span>Rechercher</span></button></div>
+    <div id="fig-search-box">
+      <div class="row"><input id="fig-q" type="search" placeholder="Chercher une minifig (ex: Spider-Man, Kai)…"><button class="btn pri" id="fig-go" style="flex: none;">Chercher</button></div>
+      <div id="fig-status" class="sub" style="margin: 8px 0 10px; text-align: center;">Tape au moins 2 lettres, les résultats s'affichent en direct.</div>
+      <div id="fig-results"></div>
+    </div>
     <div id="fig-coll"></div>
   </section>
 
@@ -1495,6 +1515,7 @@ function tab(n) {
     document.body.classList.toggle("scan-mode", n === "scan"); if (window.setBars) setBars();
     if (n === "sets" && window.renderCollection) renderCollection();
     if (n === "figs" && window.renderFigs) renderFigs();
+    if (n === "scan" && window.updateZone) setTimeout(updateZone, 80);
     if (n === "scan") {
       if (!stream) startCam();
       else v.play().catch(() => {});
@@ -1876,7 +1897,7 @@ async function scan() {
 
   try {
     const c = captureFrame();
-    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+    const blob = await new Promise(r => cropZone(c).toBlob(r, "image/jpeg", 0.85));
     colorNote = "";
     if($("autocol").checked) {
       const res = analyseColor(c);
@@ -2147,7 +2168,7 @@ function renderCollection() {
   const unb = setsCol.filter(s => ["todo", "missing"].includes(info.get(s).c));
   const ms = buyRows(unb).reduce((n, r) => n + r.miss, 0), nt = unb.reduce((n, s) => n + info.get(s).need, 0);
   const wmiss = setsCol.some(s => info.get(s).c === "wish" && info.get(s).miss > 0);
-  let top = '<button class="btn sm full" data-notices="1" style="margin-bottom:8px">📚 Notices de mes sets</button>';
+  let top = '<div class="row" style="margin-bottom:8px"><button class="btn sm full" data-notices="1">📚 Notices de mes sets</button><button class="btn sm" data-view="1" style="flex:none">' + (setView === "grid" ? "☰ Liste" : "▦ Grille") + '</button></div>';
   if (colCat === "todo" || colCat === "missing") {
     if (unb.length > 1) top += `<div class="set-card"><div class="pn">Tous les sets non construits ensemble</div>
       <div class="meta" style="color:${ms ? 'var(--warning)' : 'var(--success)'}">${ms ? plural(ms, "pièce") + " manquante" + (ms > 1 ? "s" : "") + " sur " + nt : "Ton stock couvre tout (" + nt + " pièces)"}</div></div>`;
@@ -2165,14 +2186,21 @@ function renderCollection() {
       ${c === "todo" || c === "missing" ? `<button class="btn sm ${s.reserved ? '' : 'pri'} full" style="margin-top:8px" data-act="res" data-num="${esc(s.num)}">${s.reserved ? "Libérer les pièces" : "Réserver les pièces"}</button>` : ""}
     </div>`;
   };
+  const mini = s => {
+    const { c, miss, pct } = info.get(s), col = miss === 0 ? "var(--success)" : (pct > 50 ? "var(--warning)" : "var(--primary)");
+    const t = hasConflict(s, ck) ? "⚠ Conflit" : (c === "built" ? "🧱 Construit" : (s.reserved ? "🔒 Réservé" : (miss ? (miss <= 10 ? "🔥 " : "") + "−" + miss + " · " + pct + "%" : "✓ Complet")));
+    return `<div class="fcard" data-open="${esc(s.num)}"><img src="${esc(s.img)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt=""><div class="fn">${esc(s.name)}</div>
+      <div class="fm" style="color:${col}">${t}</div>${c === "built" ? "" : `<div class="progress-container" style="margin-top:6px"><div class="progress-bar" style="width:${pct}%; background:${col};"></div></div>`}</div>`;
+  };
   const seg = [["built", "Construits"], ["todo", "À construire"], ["missing", "À compléter"], ["wish", "Envies"]].map(([c, l]) => `<button data-cat="${c}" class="${colCat === c ? 'on' : ''}"><span>${l}</span><b>${cnt[c]}</b></button>`).join("");
   el.innerHTML = `<div class="scan-results-title" style="margin:16px 0 0"><span>Ma collection · ${plural(setsCol.length, "set")}</span></div>
     <div class="seg s4">${seg}</div>${top}
-    ${list.length ? list.map(card).join("") : '<div class="empty">' + (colCat === "wish" ? "Ajoute des sets à ta liste d'envies depuis la recherche (bouton ⭐)." : "Aucun set dans cette catégorie.") + '</div>'}`;
+    ${list.length ? (setView === "grid" ? '<div class="fgrid">' + list.map(mini).join("") + "</div>" : list.map(card).join("")) : '<div class="empty">' + (colCat === "wish" ? "Ajoute des sets à ta liste d'envies depuis la recherche (bouton ⭐)." : "Aucun set dans cette catégorie.") + '</div>'}`;
 }
 
 $("set-collection").onclick = e => {
   const sg = e.target.closest("[data-cat]"); if (sg) { colCat = sg.dataset.cat; renderCollection(); return; }
+  const vw = e.target.closest("[data-view]"); if (vw) { setView = setView === "grid" ? "list" : "grid"; LSset("bs_setview", setView); renderCollection(); return; }
   const nt = e.target.closest("[data-notices]"); if (nt) { renderNotices(); $("modal-nt").classList.add("open"); return; }
   const by = e.target.closest("[data-buy]"); if (by) { if (by.dataset.buy === "wish") buyWish = true; renderBuy(); $("modal-buy").classList.add("open"); return; }
   const b = e.target.closest("[data-act]");
@@ -2182,7 +2210,7 @@ $("set-collection").onclick = e => {
 
 /* Fiche détail d'un set */
 document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-set"><div class="modal-card" id="modal-set-card"></div></div>');
-let partSort = LS("brickstock-psort") || "miss";
+let partSort = LS("brickstock-psort") || "miss", setView = LS("bs_setview") || "list";
 function openSetDetail(num) { openNum = num; renderDetail(); $("modal-set").classList.add("open"); }
 function renderDetail() {
   const s = findSet(openNum), box = $("modal-set-card"); if (!s) return;
@@ -2404,7 +2432,7 @@ $("modal-buy").onclick = e => {
 };
 
 /* Minifigs : collection de figurines complètes */
-let figs = [], figRes = [], figSort = LS("bs_figsort") || "univ", themes = null, figOpen = null, partSetsList = [];
+let figs = [], figRes = [], figSort = LS("bs_figsort") || "univ", themes = null, figOpen = null, partSetsList = [], figMode = LS("bs_figmode") || "", figTok = 0, figT = null;
 try { figs = JSON.parse(localStorage.getItem("brickstock-figs") || "[]"); } catch(e) {}
 try { themes = JSON.parse(localStorage.getItem("brickstock-themes") || "null"); } catch(e) {}
 const saveFigs = () => { tStamp = Date.now(); LSset("bs_t", String(tStamp)); LSset("brickstock-figs", JSON.stringify(figs)); push(); };
@@ -2425,81 +2453,109 @@ function univOf(tid) {
   const path = []; let t = tid; while (t && themes[t]) { path.push(themes[t].n); t = themes[t].p; }
   const root = path[path.length - 1], sub = path[path.length - 2] || root; return UMB.includes(root) ? sub : root;
 }
+async function fetchFigSets(f) {
+  const j = await rb("minifigs/" + f.num + "/sets/?page_size=100");
+  const L = (j.results || []).sort((a, b) => a.year - b.year);
+  f.nsets = j.count != null ? j.count : L.length; f.sets = L.slice(0, 40).map(x => ({ num: x.set_num, n: x.name, y: x.year }));
+  if (L[0] && (!f.year || f.univ === "Autre")) { await loadThemes(); f.year = L[0].year; f.univ = univOf(L[0].theme_id); }
+}
 async function addFig(r) {
   const ex = figs.find(f => f.num === r.set_num);
-  if (ex) { ex.qty++; saveFigs(); renderFigs(); showToast("+1 " + ex.name); return; }
+  if (ex) { ex.qty++; saveFigs(); renderFigs(); showToast("+1 " + ex.name + " · ×" + ex.qty); return; }
   showToast("Ajout de la minifig…");
-  const f = { num: r.set_num, name: r.name, img: r.set_img_url, nparts: r.num_parts, qty: 1, added: Date.now(), univ: "Autre", year: 0, nsets: 0, sets: [], parts: null };
-  try {
-    await loadThemes();
-    const j = await rb("minifigs/" + r.set_num + "/sets/?page_size=100");
-    const L = (j.results || []).sort((a, b) => a.year - b.year);
-    f.nsets = j.count != null ? j.count : L.length; f.sets = L.slice(0, 6).map(x => ({ num: x.set_num, n: x.name, y: x.year }));
-    if (L[0]) { f.year = L[0].year; f.univ = univOf(L[0].theme_id); }
-  } catch(e) {}
-  figs.push(f); saveFigs(); renderFigs(); showToast("Minifig ajoutée ✓");
+  const f = { num: r.set_num, name: r.name, img: r.set_img_url, nparts: r.num_parts, qty: 1, added: Date.now(), univ: "Autre", year: 0, nsets: 0, sets: [], parts: null, price: 0 };
+  try { await loadThemes(); await fetchFigSets(f); } catch(e) {}
+  figs.push(f); saveFigs(); renderFigs(); showToast("Ajoutée ✓ Retrouve-la dans « Ma collection »");
 }
 const figImg = u => `<img src="${esc(u || PH)}" onerror="this.onerror=null;this.src='${PH}'" alt="" referrerpolicy="no-referrer">`;
 function renderFigRes() {
   $("fig-results").innerHTML = figRes.length ? `<div class="fgrid" style="margin-bottom:14px">${figRes.map((r, i) => `<div class="fcard">${figImg(r.set_img_url)}
-    <div class="fn">${esc(r.name)}</div><div class="fm">${esc(r.set_num)} · ${r.num_parts} pièces</div>
+    <div class="fn">${esc(r.name)}</div><div class="fm">${esc(r.set_num)} · ${r.num_parts} pièces${figs.some(f => f.num === r.set_num) ? " · ✓ ajoutée" : ""}</div>
     <button class="btn sm pri full" style="margin-top:6px" data-fa="${i}">➕ Ajouter</button></div>`).join("")}</div>` : "";
+}
+function applyFigMode() {
+  if (!figMode) figMode = figs.length ? "coll" : "search";
+  $("fig-search-box").style.display = figMode === "search" ? "" : "none";
+  $("fig-coll").style.display = figMode === "coll" ? "" : "none";
+  $("fig-mode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.fm === figMode));
 }
 function renderFigs() {
   const el = $("fig-coll"); if (!el) return;
-  if (!figs.length) { el.innerHTML = ""; return; }
-  const cmp = { univ: (a, b) => a.univ.localeCompare(b.univ) || a.name.localeCompare(b.name), year: (a, b) => b.year - a.year, yearasc: (a, b) => (a.year || 9999) - (b.year || 9999), added: (a, b) => b.added - a.added, alpha: (a, b) => a.name.localeCompare(b.name), rare: (a, b) => (a.nsets || 999) - (b.nsets || 999), parts: (a, b) => b.nparts - a.nparts }[figSort];
-  const L = figs.slice().sort(cmp), total = figs.reduce((n, f) => n + f.qty, 0);
+  const total = figs.reduce((n, f) => n + f.qty, 0), val = figs.reduce((n, f) => n + (f.price || 0) * f.qty, 0);
+  $("fig-cnt").textContent = total; applyFigMode();
+  if (!figs.length) { el.innerHTML = '<div class="empty">Aucune minifig pour l\'instant. Va dans « Rechercher » pour en ajouter.</div>'; return; }
+  const cmp = { univ: (a, b) => a.univ.localeCompare(b.univ) || a.name.localeCompare(b.name), year: (a, b) => b.year - a.year, yearasc: (a, b) => (a.year || 9999) - (b.year || 9999), added: (a, b) => b.added - a.added, alpha: (a, b) => a.name.localeCompare(b.name), rare: (a, b) => (a.nsets || 999) - (b.nsets || 999), parts: (a, b) => b.nparts - a.nparts, value: (a, b) => (b.price || 0) - (a.price || 0) }[figSort];
+  const L = figs.slice().sort(cmp);
   const card = f => `<div class="fcard" data-fo="${esc(f.num)}">${figImg(f.img)}${f.qty > 1 ? `<span class="fq">×${f.qty}</span>` : ""}
-    <div class="fn">${esc(f.name)}</div><div class="fm">${esc(f.univ)} · ${f.year || "?"}${figSort === "rare" && f.nsets ? " · " + plural(f.nsets, "set") : ""}</div></div>`;
+    <div class="fn">${esc(f.name)}</div><div class="fm">${esc(f.univ)} · ${f.year || "?"}${figSort === "rare" && f.nsets ? " · " + plural(f.nsets, "set") : ""}${figSort === "value" && f.price ? " · " + f.price + " €" : ""}</div></div>`;
   let body;
   if (figSort === "univ") { const g = {}; L.forEach(f => (g[f.univ] = g[f.univ] || []).push(f)); body = Object.entries(g).map(([u, a]) => `<div class="fig-h">${esc(u)} · ${a.length}</div><div class="fgrid">${a.map(card).join("")}</div>`).join(""); }
   else body = `<div class="fgrid">${L.map(card).join("")}</div>`;
-  const opts = [["univ", "Par univers"], ["year", "Date de sortie (récentes)"], ["yearasc", "Date de sortie (anciennes)"], ["added", "Date d'ajout"], ["alpha", "Personnage A → Z"], ["rare", "Rareté (peu de sets d'abord)"], ["parts", "Nombre de pièces"]];
-  el.innerHTML = `<div class="scan-results-title" style="margin:8px 0"><span>Mes minifigs · ${total} (${figs.length} différentes)</span></div>
+  const opts = [["univ", "Par univers"], ["year", "Date de sortie (récentes)"], ["yearasc", "Date de sortie (anciennes)"], ["added", "Date d'ajout"], ["alpha", "Personnage A → Z"], ["rare", "Rareté (peu de sets d'abord)"], ["parts", "Nombre de pièces"], ["value", "Valeur saisie"]];
+  el.innerHTML = `<div class="scan-results-title" style="margin:8px 0"><span>${total} minifig${total > 1 ? "s" : ""} (${figs.length} différentes)${val ? " · valeur saisie " + Math.round(val) + " €" : ""}</span></div>
     <select id="fig-sort" style="margin-bottom:8px">${opts.map(([v, l]) => `<option value="${v}" ${figSort === v ? "selected" : ""}>${l}</option>`).join("")}</select>${body}`;
 }
 document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-fig"><div class="modal-card" id="modal-fig-card"></div></div>');
 function renderFigDetail() {
   const f = figs.find(x => x.num === figOpen), box = $("modal-fig-card"); if (!f) return;
+  const free = p => { const k = p.part + "|" + p.color; return Math.max(0, stockQty(k) - committedQty(k)); };
+  let loose = "";
+  if (f.parts && f.parts.length) {
+    const tot = f.parts.reduce((n, p) => n + p.qty, 0), got = f.parts.reduce((n, p) => n + Math.min(p.qty, free(p)), 0), can = Math.min(...f.parts.map(p => Math.floor(free(p) / p.qty)));
+    loose = `<div class="meta" style="margin-top:6px">Pièces en vrac dans ton stock : ${got}/${tot}${can > 0 ? " · de quoi en assembler " + can : ""}</div>`;
+  }
   box.innerHTML = `<div class="modal-header"><h3>${esc(f.name)}</h3><button class="icon-btn" data-fd="close">✕</button></div>
     <div class="set-header" style="align-items:flex-start">${figImg(f.img)}<div class="grow"><div class="sub">${esc(f.num)}</div>
-      <div class="meta">${esc(f.univ)} · ${f.year || "année inconnue"}</div><div class="meta">${f.nparts} pièces · présente dans ${plural(f.nsets, "set")}</div></div></div>
-    <div class="stepper" style="margin-top:12px"><button class="btn" data-fd="minus">−</button><div style="flex:1;text-align:center;font-size:18px;font-weight:700">×${f.qty}</div><button class="btn" data-fd="plus">+</button></div>
-    ${f.sets.length ? `<div class="sub" style="margin:12px 0 4px">Sets où elle apparaît${f.nsets > f.sets.length ? " (les plus anciens)" : ""}</div>${f.sets.map(x => `<div class="sub" style="color:var(--text-main)">${x.y} · ${esc(x.n)} (${esc(x.num)})</div>`).join("")}` : ""}
+      <div class="meta">${esc(f.univ)} · ${f.year || "année inconnue"}</div><div class="meta">${f.nparts} pièces · présente dans ${plural(f.nsets, "set")}</div>${loose}</div></div>
+    <div class="sub" style="margin:12px 0 4px">Exemplaires complets dans ma collection</div>
+    <div class="stepper"><button class="btn" data-fd="minus">−</button><div style="flex:1;text-align:center;font-size:18px;font-weight:700">×${f.qty}</div><button class="btn" data-fd="plus">+</button></div>
+    <div class="sub" style="margin:12px 0 4px">Valeur estimée par figurine, saisie à la main (€)</div>
+    <input id="fig-price" type="number" inputmode="decimal" min="0" step="0.5" value="${f.price || ""}" placeholder="Ex : 6.50">
     <div class="set-actions" style="margin-top:10px"><a class="btn sm full" target="_blank" rel="noopener" href="https://rebrickable.com/minifigs/${esc(f.num)}/">🌐 Rebrickable</a>
       <a class="btn sm full" target="_blank" rel="noopener" href="https://www.bricklink.com/v2/search.page?q=${encodeURIComponent(f.name)}">💰 Prix BrickLink</a></div>
+    ${f.sets.length ? `<div class="sub" style="margin:14px 0 4px">Sets où elle apparaît (${f.nsets}) · ✓ ta collection · ⭐ tes envies</div>${f.sets.map(x => { const o = findSet(x.num); return `<div class="sub" data-fs="${esc(x.num)}" style="padding:7px 0;border-bottom:1px solid var(--card-border);cursor:pointer;color:var(--text-main)">${o ? (o.wish ? "⭐" : "✓") : "▫️"} ${x.y} · ${esc(x.n)} (${esc(x.num)}) ›</div>`; }).join("")}${f.nsets > f.sets.length ? `<div class="sub" style="margin-top:4px">… et ${f.nsets - f.sets.length} autres</div>` : ""}` : ""}
     <div class="sub" style="margin:14px 0 6px">Pièces de la figurine${f.parts ? " (" + f.parts.length + ")" : ""}</div>
-    ${f.parts ? `<div class="set-parts-grid">${f.parts.map(p => `<div class="set-part-item"><span class="badge-status">×${p.qty}</span>${pImg(p.part, p.color, p.i)}
+    ${f.parts ? `<div class="set-parts-grid">${f.parts.map(p => { const h = Math.min(p.qty, free(p)); return `<div class="set-part-item"><span class="badge-status ${h >= p.qty ? 'has' : (h > 0 ? 'missing' : '')}">${h}/${p.qty}</span>${pImg(p.part, p.color, p.i)}
       <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
-      <div style="color:var(--text-muted); font-size:10px; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.n)}</div></div>`).join("")}</div>` : '<div class="sub">Chargement…</div>'}
+      <div style="color:var(--text-muted); font-size:10px; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.n)}</div></div>`; }).join("")}</div>` : '<div class="sub">Chargement…</div>'}
     <button class="btn sm full" style="margin-top:14px" data-fd="del">Retirer de mes minifigs</button>`;
 }
 async function openFig(num) {
   figOpen = num; renderFigDetail(); $("modal-fig").classList.add("open");
-  const f = figs.find(x => x.num === num);
-  if (f && !f.parts && rbKey) {
-    try { const j = await rb("minifigs/" + num + "/parts/?page_size=100");
+  const f = figs.find(x => x.num === num); if (!f || !rbKey) return;
+  try {
+    if (f.nsets > f.sets.length && f.sets.length < 40) { await fetchFigSets(f); saveFigs(); if (figOpen === num) renderFigDetail(); }
+    if (!f.parts) {
+      const j = await rb("minifigs/" + num + "/parts/?page_size=100");
       f.parts = (j.results || []).filter(p => !p.is_spare).map(p => ({ part: p.part.part_num, color: p.color.id, n: p.part.name, i: goodImg(p.part.part_img_url), qty: p.quantity }));
-      saveFigs(); if (figOpen === num) renderFigDetail(); } catch(e) {}
-  }
+      saveFigs(); if (figOpen === num) renderFigDetail();
+    }
+  } catch(e) {}
 }
-$("fig-go").onclick = async () => {
-  const q = $("fig-q").value.trim(); if (!q) return;
-  if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ⚙️ Paramètres");
-  $("fig-status").textContent = "Recherche…";
-  try { figRes = (await rb("minifigs/?search=" + encodeURIComponent(q) + "&page_size=30")).results || [];
-    $("fig-status").textContent = figRes.length ? plural(figRes.length, "résultat") : "Aucune minifig trouvée"; renderFigRes();
-  } catch(e) { $("fig-status").textContent = "Erreur : " + e.message; }
+async function figSearch(q) {
+  const tok = ++figTok;
+  try { const j = await rb("minifigs/?search=" + encodeURIComponent(q) + "&page_size=30"); if (tok !== figTok) return;
+    figRes = j.results || []; $("fig-status").textContent = figRes.length ? plural(figRes.length, "résultat") : "Aucune minifig trouvée"; renderFigRes();
+  } catch(e) { if (tok === figTok) $("fig-status").textContent = "Erreur : " + e.message; }
+}
+$("fig-q").oninput = () => {
+  clearTimeout(figT); const q = $("fig-q").value.trim();
+  if (q.length < 2) { figTok++; figRes = []; renderFigRes(); $("fig-status").textContent = "Tape au moins 2 lettres, les résultats s'affichent en direct."; return; }
+  if (!rbKey) { $("fig-status").textContent = "Ajoute ta clé Rebrickable dans ⚙️ Paramètres."; return; }
+  $("fig-status").textContent = "Recherche…"; figT = setTimeout(() => figSearch(q), 400);
 };
+$("fig-go").onclick = () => { const q = $("fig-q").value.trim(); if (q.length >= 2 && rbKey) { clearTimeout(figT); figSearch(q); } };
 $("fig-q").onkeydown = e => { if (e.key === "Enter") $("fig-go").click(); };
 $("s-figs").onclick = e => {
+  const m = e.target.closest("[data-fm]"); if (m) { figMode = m.dataset.fm; LSset("bs_figmode", figMode); applyFigMode(); return; }
   const a = e.target.closest("[data-fa]"); if (a) { addFig(figRes[+a.dataset.fa]); triggerHaptic(); return; }
   const o = e.target.closest("[data-fo]"); if (o) openFig(o.dataset.fo);
 };
 $("s-figs").onchange = e => { if (e.target.id === "fig-sort") { figSort = e.target.value; LSset("bs_figsort", figSort); renderFigs(); } };
+$("modal-fig").onchange = e => { const f = figs.find(x => x.num === figOpen); if (f && e.target.id === "fig-price") { f.price = parseFloat(String(e.target.value).replace(",", ".")) || 0; saveFigs(); renderFigs(); } };
 $("modal-fig").onclick = e => {
   const ov = $("modal-fig"); if (e.target === ov) { ov.classList.remove("open"); return; }
+  const fs = e.target.closest("[data-fs]"); if (fs) { ov.classList.remove("open"); tab("sets"); $("q-set").value = fs.dataset.fs; searchSet(); return; }
   const d = e.target.closest("[data-fd]"); if (!d) return;
   const f = figs.find(x => x.num === figOpen); if (!f) return; const a = d.dataset.fd;
   if (a === "close") { ov.classList.remove("open"); return; }
@@ -2508,6 +2564,50 @@ $("modal-fig").onclick = e => {
   saveFigs(); renderFigDetail(); renderFigs();
 };
 renderFigs();
+
+/* Recherche de sets en direct + zone de scan autour de la cible */
+let sgT = null, sgTok = 0;
+const hideSugg = () => { $("set-sugg").innerHTML = ""; };
+async function setSuggest(q) {
+  const tok = ++sgTok, digits = /^[0-9]+$/.test(q), enc = encodeURIComponent(q);
+  try {
+    let j; try { j = await rb("sets/?search=" + enc + "&page_size=100&ordering=-year"); } catch(e) { j = await rb("sets/?search=" + enc + "&page_size=100"); }
+    if (tok !== sgTok) return;
+    let L = j.results || []; if (digits) L = L.filter(x => x.set_num.startsWith(q));
+    L = L.sort((a, b) => b.year - a.year).slice(0, 12);
+    $("set-sugg").innerHTML = L.length ? L.map(x => `<div class="sg-row" data-sn="${esc(x.set_num)}">${figImg(x.set_img_url)}<div class="grow"><div class="pn">${esc(x.name)}</div><div class="sub">${esc(x.set_num)} · ${x.year} · ${x.num_parts} pièces</div></div></div>`).join("") : '<div class="sub" style="padding:10px">Aucun set trouvé.</div>';
+  } catch(e) { if (tok === sgTok) hideSugg(); }
+}
+$("q-set").oninput = () => {
+  clearTimeout(sgT); const q = $("q-set").value.trim();
+  if (!rbKey || q.length < (/^[0-9]+$/.test(q) ? 2 : 3)) { sgTok++; hideSugg(); return; }
+  sgT = setTimeout(() => setSuggest(q), 350);
+};
+$("btn-search-set").onclick = () => { hideSugg(); searchSet(); };
+$("q-set").onkeydown = e => { if (e.key === "Enter") { hideSugg(); searchSet(); } };
+$("set-sugg").onclick = e => { const r = e.target.closest("[data-sn]"); if (r) { $("q-set").value = r.dataset.sn; sgTok++; hideSugg(); searchSet(); } };
+
+const ZF = { narrow: 0.4, normal: 0.6, wide: 1 };
+let zoneKey = LS("bs_zone") || "normal";
+$("vw-box").insertAdjacentHTML("beforeend", '<div id="scan-zone"></div>');
+function updateZone() {
+  const box = $("vw-box"), z = $("scan-zone"), f = ZF[zoneKey] || 0.6;
+  $("ap-zone").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === zoneKey));
+  const bw = box.clientWidth, bh = box.clientHeight; if (!bw || f >= 1) { z.style.display = "none"; return; }
+  const side = f * Math.min(bw, bh), left = Math.max(0, Math.min(bw - side, sampleX * bw - side / 2)), top = Math.max(0, Math.min(bh - side, sampleY * bh - side / 2));
+  z.style.cssText = "display:block;left:" + left + "px;top:" + top + "px;width:" + side + "px;height:" + side + "px";
+}
+function cropZone(c) { // ne garde que la zone autour de la cible : la pièce visée, pas celles du bord
+  const f = ZF[zoneKey] || 0.6; if (f >= 1) return c;
+  const side = Math.round(f * Math.min(c.width, c.height));
+  const left = Math.max(0, Math.min(c.width - side, Math.round(sampleX * c.width - side / 2))), top = Math.max(0, Math.min(c.height - side, Math.round(sampleY * c.height - side / 2)));
+  const z = document.createElement("canvas"); z.width = z.height = Math.max(side, 320);
+  z.getContext("2d").drawImage(c, left, top, side, side, 0, 0, z.width, z.height); return z;
+}
+$("vw-box").addEventListener("click", updateZone);
+window.addEventListener("resize", updateZone);
+$("ap-zone").onclick = e => { const b = e.target.closest("button[data-v]"); if (!b) return; zoneKey = b.dataset.v; LSset("bs_zone", zoneKey); updateZone(); };
+updateZone();
 
 /* Notices de tous les sets */
 document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-nt"><div class="modal-card" id="modal-nt-card"></div></div>');
