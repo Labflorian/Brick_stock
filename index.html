@@ -3582,5 +3582,27 @@ $("set-sug").addEventListener("click", e => {
 });
 applySetMode();
 </script>
+<script>
+/* Agrandir les images : touche la photo d'une fiche (set, pièce, minifig) ou ta photo du panier */
+(function () {
+  var st = document.createElement("style");
+  st.textContent = ".set-header img,.bk-thumb{cursor:zoom-in}#img-zoom{position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:rgba(0,0,0,.88);padding:16px;touch-action:manipulation}#img-zoom.open{display:flex}#img-zoom img{max-width:94vw;max-height:78dvh;object-fit:contain;background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.6)}#img-zoom .z-cap{color:#fff;font-size:13px;font-weight:600;text-align:center;max-width:90vw}#img-zoom .z-x{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;font-size:20px}";
+  document.head.appendChild(st);
+  var ov = document.createElement("div"); ov.id = "img-zoom";
+  ov.innerHTML = '<button class="z-x" aria-label="Fermer">✕</button><img alt=""><div class="z-cap"></div>';
+  document.body.appendChild(ov);
+  var close = function () { ov.classList.remove("open"); };
+  ov.addEventListener("click", close);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+  document.addEventListener("click", function (e) {
+    var im = e.target.closest && e.target.closest(".set-header img, .bk-thumb");
+    if (!im || !im.src || /^data:image\/svg/.test(im.src)) return;
+    e.stopPropagation(); e.preventDefault();
+    var mc = im.closest(".modal-card"), nm = mc && mc.querySelector("h3"), t = ov.querySelector("img");
+    t.src = im.src; ov.querySelector(".z-cap").textContent = (nm ? nm.textContent : (im.title || "")).trim();
+    ov.classList.add("open");
+  }, true);
+})();
+</script>
 </body>
 </html>
