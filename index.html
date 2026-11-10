@@ -803,6 +803,75 @@ body.raf-on .basket { display: flex; }
 .vchip.part { border-color: var(--warning); color: var(--warning); }
 .vchip.no { color: var(--text-muted); }
 .fmk { position: absolute; top: 6px; left: 6px; background: var(--success); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 10px; font-weight: 700; z-index: 1; }
+
+/* ===== BrickStock v3 ===== */
+/* Boutons de recherche : hauteur fixe, texte centré */
+.srow { flex-wrap: nowrap; align-items: center; }
+.srow .btn { height: 40px; padding: 0 14px; white-space: nowrap; align-self: center; flex: none; }
+.srow input { height: 40px; }
+
+/* Scan : plus de notices, viseur plus haut */
+#status { display: none; }
+.vw-container { height: 210px; height: clamp(190px, 32dvh, 360px); }
+body.raf-on .vw-container { height: 180px; height: clamp(160px, 26dvh, 300px); }
+
+/* Quantité au clavier */
+.qin { width: 46px; height: 36px; padding: 0 2px; text-align: center; font-weight: 700; font-size: 15px; border-radius: 8px; -moz-appearance: textfield; user-select: text; -webkit-user-select: text; }
+.qin::-webkit-outer-spin-button, .qin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qstep .qin { flex: none; }
+
+/* Zone de scan réglable */
+.zone-h { position: absolute; width: 32px; height: 32px; margin: -16px 0 0 -16px; border-radius: 50%; background: rgba(255,255,255,.92); color: #000; font-size: 15px; font-weight: 800; display: none; place-items: center; z-index: 12; touch-action: none; cursor: nwse-resize; box-shadow: 0 1px 6px rgba(0,0,0,.5); }
+.zone-chip { position: absolute; left: 8px; bottom: 8px; z-index: 12; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; border: 0; cursor: pointer; backdrop-filter: blur(4px); }
+
+/* Page plein écran du panier */
+#modal-bk { padding: 0; align-items: stretch; }
+#modal-bk-card { max-width: none; max-height: none; height: 100%; border-radius: 0; display: flex; flex-direction: column; overflow: hidden; padding: 12px; padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
+.bk-full-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; touch-action: pan-y; overscroll-behavior: contain; }
+
+/* Recherche de sets : lignes avec boutons */
+.sg-row .sg-add { flex: none; }
+.sg-row .sg-tag { flex: none; font-size: 12px; font-weight: 700; color: var(--success); padding: 0 6px; }
+.sg-row:last-child { border-bottom: 0; }
+.fs-list { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; overflow: hidden; margin-top: 8px; }
+.fs-list:empty { display: none; }
+.fsv-box { position: relative; width: 100%; height: 210px; height: clamp(200px, 34dvh, 380px); border-radius: var(--radius-md); overflow: hidden; background: #000; border: 1px solid var(--card-border); }
+.fsv-box video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ===== Tablette / ordinateur ===== */
+@media (min-width: 768px) {
+  body { max-width: 920px; }
+  nav { max-width: 920px; }
+  #s-scan.on { max-width: 920px; }
+  .modal-card { max-width: 720px; max-height: 88vh; }
+  .set-parts-grid { max-height: 60vh; }
+  .fgrid { grid-template-columns: repeat(3, 1fr); }
+  #list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  #list .card { margin-bottom: 0; }
+  #list .empty { grid-column: 1 / -1; }
+  section { padding: 16px; }
+}
+@media (min-width: 1100px) {
+  body { max-width: 1200px; }
+  nav { max-width: 1200px; }
+  #s-scan.on { max-width: 1200px; }
+  .fgrid { grid-template-columns: repeat(4, 1fr); }
+  #list { grid-template-columns: repeat(3, 1fr); }
+}
+/* Scan en deux colonnes : caméra à gauche, panier / propositions à droite */
+@media (min-width: 900px) {
+  #s-scan.on { display: grid; grid-template-columns: minmax(320px, 1.15fr) minmax(300px, 1fr); grid-template-rows: auto auto auto auto minmax(0, 1fr) auto; column-gap: 16px; row-gap: 8px; overflow-y: auto; padding: 14px 16px; align-content: start; }
+  #s-scan .vw-container, body.raf-on #s-scan .vw-container { grid-column: 1; grid-row: 1; height: auto; aspect-ratio: 4 / 3; max-height: 56vh; width: 100%; }
+  #s-scan .scan-quick { grid-column: 1; grid-row: 2; }
+  #s-scan #scan-opts { grid-column: 1; grid-row: 3; }
+  #s-scan #scan-calib { grid-column: 1; grid-row: 4; }
+  #s-scan .scan-toolbar { grid-column: 1; grid-row: 6; }
+  #s-scan .basket, #s-scan .scan-results-container { grid-column: 2; grid-row: 1 / 7; min-height: 0; }
+  .basket.col .bk-body { display: flex; }
+  #bk-tog .chev, #bk-full { display: none; }
+  #modal-bk { display: none !important; }
+  .scan-bottom #snap { font-size: 16px; padding: 14px 12px; }
+}
 </style>
 </head>
 <body>
@@ -840,7 +909,7 @@ body.raf-on .basket { display: flex; }
     <div class="seg" id="ap-btn"><button data-v="soft">Discrets</button><button data-v="solid">Pleins</button></div>
     <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0 4px"><input type="checkbox" id="ap-hap"> Vibration au toucher</label>
     <div class="sub" style="margin-top:6px">Zone de scan autour de la cible</div>
-    <div class="seg" id="ap-zone"><button data-v="narrow">Étroite</button><button data-v="normal">Normale</button><button data-v="wide">Large</button></div>
+    <div class="seg" id="ap-zone"><button data-v="narrow">Petite</button><button data-v="normal">Moyenne</button><button data-v="wide">Grande</button><button data-v="full">Tout</button></div>
 
     <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 12px 0;">
 
@@ -936,7 +1005,7 @@ body.raf-on .basket { display: flex; }
   <section id="s-sets">
     <div class="seg" id="set-mode"><button data-sm="coll"><span>Ma collection</span><b id="set-cnt">0</b></button><button data-sm="search"><span>Rechercher</span></button></div>
     <div id="set-search-box">
-      <div class="row">
+      <div class="row srow">
         <input id="q-set" type="search" placeholder="N° ou nom de set (ex: 76311, Spider-Man)…">
         <button class="btn pri" id="btn-search-set" style="flex: none;">Rechercher</button>
       </div>
@@ -962,7 +1031,8 @@ body.raf-on .basket { display: flex; }
   <section id="s-figs">
     <div class="seg" id="fig-mode"><button data-fm="coll"><span>Ma collection</span><b id="fig-cnt">0</b></button><button data-fm="search"><span>Rechercher</span></button></div>
     <div id="fig-search-box">
-      <div class="row"><input id="fig-q" type="search" placeholder="Chercher une minifig (ex: Spider-Man, Kai)…"><button class="btn pri" id="fig-go" style="flex: none;">Chercher</button></div>
+      <div class="row srow"><input id="fig-q" type="search" placeholder="Chercher une minifig (ex: Spider-Man, Kai)…"><button class="btn pri" id="fig-go" style="flex: none;">Chercher</button></div>
+      <button class="btn full" id="fig-scan" style="margin-top:8px">📷 Scanner une minifig</button>
       <div id="fig-status" class="sub" style="margin: 8px 0 10px; text-align: center;">Tape au moins 2 lettres, les résultats s'affichent en direct.</div>
       <div id="fig-results"></div>
     </div>
@@ -976,7 +1046,6 @@ body.raf-on .basket { display: flex; }
       <div class="viewfinder-overlay">
         <div class="color-target-spot" id="color-target-spot" title="Point d'analyse couleur (Touchez pour viser)"></div>
       </div>
-      <div class="vw-hint-text">Touchez la pièce pour viser sa couleur · Pincez pour zoomer</div>
       <div class="scan-line"></div>
       <div class="cam-zoom-badge" id="zoom-badge">Zoom 1.0x</div>
     </div>
@@ -987,7 +1056,7 @@ body.raf-on .basket { display: flex; }
       <button class="btn sm" id="raf-btn" title="Mode rafale : chaque photo s'ajoute à un panier">🗂 Rafale</button>
     </div>
 
-    <div class="row" style="margin: 0; align-items: center; justify-content: space-between;">
+    <div class="row" id="scan-opts" style="margin: 0; align-items: center; justify-content: space-between;">
       <label class="chk">
         <input type="checkbox" id="autocol" checked> Couleur auto de la pièce
       </label>
@@ -996,7 +1065,7 @@ body.raf-on .basket { display: flex; }
       </label>
     </div>
 
-    <div class="row" style="margin:0">
+    <div class="row" id="scan-calib" style="margin:0">
       <button class="btn sm" id="calib">⚪ Calibrer le blanc</button>
       <button class="btn sm" id="calib-reset" style="flex:none" title="Réinitialiser le calibrage">↺</button>
       <button class="btn sm" id="torch-btn" style="flex:none;display:none" title="Allumer / éteindre la torche">🔦 Flash</button>
@@ -1007,6 +1076,7 @@ body.raf-on .basket { display: flex; }
     <div class="basket" id="basket">
       <div class="bk-head">
         <button class="bk-tog" id="bk-tog"><span class="chev">▾</span><span>Pièces à valider (<b id="bk-n">0</b>)<span class="sub" id="bk-refs"></span></span></button>
+        <button class="btn sm" id="bk-full" title="Afficher la liste en plein écran">⤢ Liste</button>
         <button class="btn sm pri" id="bk-add">📥 Tout ajouter au stock</button>
       </div>
       <div class="cand-grid bk-body" id="bk-body"></div>
@@ -1911,7 +1981,7 @@ function csv() {
 
 /* Camera & 2-Finger Pinch Zoom Control */
 let stream = null, timer = null, busy = false;
-const v = $("v"), st = t => $("status").textContent = t;
+const v = $("v"), st = t => { $("status").textContent = t; if (/Erreur|Aucune|⚠/.test(t) && typeof showToast === "function") showToast(t); };
 let zoom = 1.0;
 let touchStartDist = 0, touchStartZoom = 1.0;
 
@@ -2068,10 +2138,8 @@ let cand = [], suggested = [], colorNote = "";
 let candQty = {};
 function renderRes() {
   $("scan-count-tag").textContent = cand.length + " réponse" + (cand.length > 1 ? 's' : '');
-  if(!cand.length) {
-    $("res").innerHTML = `<div class="empty" style="padding:15px;">Appuyez sur "Scanner la pièce" pour lancer la détection</div>`;
-    return;
-  }
+  $("res").parentElement.style.display = cand.length ? "" : "none";
+  if(!cand.length) { $("res").innerHTML = ""; return; }
 
   const TRANS_SWATCHES = [47, 36, 33, 43, 34, 46, 182, 40];
   const QUICK_SWATCHES = [...new Set([...suggested, 0, 15, 4, 320, 1, 14, 2, 25, 71])].slice(0, 9);
@@ -2086,7 +2154,7 @@ function renderRes() {
       <div class="pn">${esc(x.part)} ${colLabel}</div>
       <div class="name">${esc(x.name)}</div>${candStock(x)}
     </div>
-    <div class="qstep"><button data-qi="${i}" data-qd="-1">−</button><b data-qv="${i}">${candQty[i] || 1}</b><button data-qi="${i}" data-qd="1">+</button></div>
+    <div class="qstep"><button data-qi="${i}" data-qd="-1">−</button><input class="qin" type="number" inputmode="numeric" min="1" data-qv="${i}" value="${candQty[i] || 1}"><button data-qi="${i}" data-qd="1">+</button></div>
     <button class="btn pri" data-i="${i}">+ Ajouter</button>
     <div class="quick-swatches">
       ${QUICK_SWATCHES.map(cId => `<span class="quick-swatch ${cId==curCol?'active':''}" style="background:${colRgb(cId)}" title="${esc(colName(cId))}" data-item="${i}" data-cid="${cId}"></span>`).join("")}
@@ -2114,11 +2182,11 @@ $("res").onclick = e => {
 
   const gi = e.target.closest("[data-pi]"); if (gi && window.openPartInfo) { openPartInfo(PIR[gi.dataset.pi]); return; }
   const qb = e.target.closest("button[data-qd]");
-  if (qb) { const i = +qb.dataset.qi; candQty[i] = Math.max(1, (candQty[i] || 1) + +qb.dataset.qd); const o = $("res").querySelector('[data-qv="' + i + '"]'); if (o) o.textContent = candQty[i]; triggerHaptic(); return; }
+  if (qb) { const i = +qb.dataset.qi; candQty[i] = Math.max(1, (candQty[i] || 1) + +qb.dataset.qd); const o = $("res").querySelector('[data-qv="' + i + '"]'); if (o) o.value = candQty[i]; triggerHaptic(); return; }
   const b = e.target.closest("button[data-i]"); if(!b) return;
   const x = cand[+b.dataset.i];
   add(x.part, x.name, x.img, curCol, candQty[+b.dataset.i] || 1);
-  candQty[+b.dataset.i] = 1; const qv = $("res").querySelector('[data-qv="' + b.dataset.i + '"]'); if (qv) qv.textContent = 1;
+  candQty[+b.dataset.i] = 1; const qv = $("res").querySelector('[data-qv="' + b.dataset.i + '"]'); if (qv) qv.value = 1;
   b.textContent = "Ajouté ✓";
   b.style.background = "#10b981";
   b.style.borderColor = "#10b981";
@@ -2170,7 +2238,7 @@ document.addEventListener("error", async e => {
   if (t.dataset.fb && !t.dataset.gen) {
     t.dataset.gen = "1"; t.classList.add("generic"); t.title = "Image indisponible dans cette couleur";
     t.src = t.dataset.fb;
-  }
+  } else if (!t.dataset.ph && typeof PH !== "undefined") { t.dataset.ph = "1"; t.src = PH; }
 }, true);
 
 document.addEventListener("visibilitychange", () => {
@@ -2211,24 +2279,37 @@ let _T = null, EQC = {}, EQ = {};
 try { EQC = JSON.parse(localStorage.getItem("brickstock-equiv") || "{}"); } catch(e) {}
 try { setsCol = JSON.parse(localStorage.getItem("brickstock-sets") || "[]").map(normSet); } catch(e) {}
 const _tick = () => { if (!_T) { _T = { sm: null, cm: null, nd: new Map() }; queueMicrotask(() => { _T = null; }); } return _T; };
-function buildEq() { // regroupe les pièces équivalentes (moules / alternatives Rebrickable)
-  const par = {}, f = x => { while (par[x] !== x) x = par[x]; return x; };
-  Object.entries(EQC).forEach(([p, L]) => { if (!(p in par)) par[p] = p; (L || []).forEach(q => { if (!(q in par)) par[q] = q; const a = f(p), b = f(q); if (a !== b) par[b] = a; }); });
-  EQ = {}; Object.keys(par).forEach(x => { EQ[x] = f(x); });
+function buildEq() { // regroupe les pièces équivalentes (moules / alternatives Rebrickable / variantes imprimées)
+  const par = {}, f = x => { while (par[x] !== x) x = par[x]; return x; }, un = (p, q) => { if (!(p in par)) par[p] = p; if (!(q in par)) par[q] = q; const a = f(p), b = f(q); if (a !== b) par[b] = a; };
+  Object.entries(EQC).forEach(([p, L]) => { if (!(p in par)) par[p] = p; (L || []).forEach(q => un(p, q)); });
+  Object.keys(par).forEach(p => { const b = printBase(p); if (b) un(p, b); });
+  EQ = {}; _CP = new Map(); Object.keys(par).forEach(x => { EQ[x] = f(x); });
 }
-const canonK = k => { const i = k.indexOf("|"), p = k.slice(0, i); return (EQ[p] || p) + k.slice(i); };
-const saveSets = () => { _T = null; tStamp = Date.now(); LSset("bs_t", String(tStamp)); LSset("brickstock-sets", JSON.stringify(setsCol)); push(); };
+const printBase = p => { const m = /^([0-9]+[a-z]?)(?:pb|pr|pat|ps)[0-9]+[a-z]?$/i.exec(p); return m ? m[1] : null; }; // 3020pb012 -> 3020
+let _CP = new Map();
+const canonPart = p => { let r = _CP.get(p); if (r === undefined) { const b = printBase(p); r = EQ[p] || (b ? (EQ[b] || b) : p); _CP.set(p, r); } return r; };
+const canonK = k => { const i = k.indexOf("|"); return canonPart(k.slice(0, i)) + k.slice(i); };
+const saveSets = () => { _T = null; tStamp = Date.now(); LSset("bs_t", String(tStamp)); LSset("brickstock-sets", JSON.stringify(setsCol)); push(); if (window.autoEquivSoon) autoEquivSoon(); };
 const needsOf = s => { const t = _tick(); let r = t.nd.get(s); if (!r) { const m = {}; s.parts.forEach(p => { if (p.st) return; const k = canonK(p.k); (m[k] = m[k] || { k, qty: 0, p }).qty += p.qty; }); r = Object.values(m); t.nd.set(s, r); } return r; };
 const stockMap = () => { const t = _tick(); if (!t.sm) { const m = {}; stock.forEach(x => { const k = canonK(x.k); m[k] = (m[k] || 0) + x.qty; }); t.sm = m; } return t.sm; };
 const stockQty = k => stockMap()[canonK(k)] || 0;
 const isCommitted = s => !s.wish && (s.reserved || (s.manual === "built" && s.added));
-const commitMap = () => { const t = _tick(); if (!t.cm) { const m = {}; setsCol.forEach(s => { if (isCommitted(s)) needsOf(s).forEach(n => { const o = m[n.k] = m[n.k] || { total: 0, by: {} }; o.total += n.qty; o.by[s.num] = n.qty; }); }); t.cm = m; } return t.cm; };
-const committedQty = (k, except) => { const o = commitMap()[canonK(k)]; return o ? o.total - (o.by[except] || 0) : 0; };
+const lockedSet = s => s.manual === "built" && s.added ? 1 : 0;
+const commitMap = () => { // allocation par priorité : sets montés d'abord, puis date de réservation (s.rsv), puis ordre de la collection
+  const t = _tick(); if (!t.cm) { const m = {}, sm = stockMap();
+    setsCol.map((s, i) => ({ s, i })).filter(x => isCommitted(x.s)).sort((a, b) => (lockedSet(b.s) - lockedSet(a.s)) || ((a.s.rsv || 0) - (b.s.rsv || 0)) || (a.i - b.i))
+      .forEach(({ s }) => needsOf(s).forEach(n => { const o = m[n.k] = m[n.k] || { total: 0, by: {}, seq: [] }; const a = Math.max(0, Math.min(n.qty, (sm[n.k] || 0) - o.total)); o.total += a; o.by[s.num] = a; o.seq.push([s.num, a]); }));
+    t.cm = m; } return t.cm; };
+const committedQty = (k, except) => { const o = commitMap()[canonK(k)]; if (!o) return 0; if (!(except in o.by)) return o.total; let n = 0; for (const [num, a] of o.seq) { if (num === except) break; n += a; } return n; };
+const rsvStat = s => { const cm = commitMap(); let got = 0, need = 0; needsOf(s).forEach(n => { need += n.qty; const o = cm[n.k]; got += o && o.by[s.num] != null ? o.by[s.num] : 0; }); return { got, need }; };
+const rsvTag = (s, short) => { const r = rsvStat(s); return r.got >= r.need ? (short ? "🔒 Réservé" : "🔒 Pièces réservées") : "🔒 Réservé " + r.got + "/" + r.need; };
 const availFor = (k, except) => Math.max(0, stockQty(k) - committedQty(k, except));
 const setMissing = s => needsOf(s).reduce((n, x) => n + Math.max(0, x.qty - availFor(x.k, s.num)), 0);
 const setCat = s => s.wish ? "wish" : (s.manual || (setMissing(s) === 0 ? "todo" : "missing"));
 const findSet = num => setsCol.find(x => x.num === num);
-const conflictKeys = () => Object.entries(commitMap()).filter(([k, o]) => o.total > (stockMap()[k] || 0)).map(([k]) => k);
+let setTmp = null; // set affiché en aperçu (pas dans la collection)
+const getSet = num => findSet(num) || (setTmp && setTmp.num === num ? setTmp : null);
+const conflictKeys = () => []; // plus de conflit : la réservation est partielle et priorisée
 const hasConflict = (s, ck) => isCommitted(s) && needsOf(s).some(n => ck.includes(n.k));
 function buyRows(sets) { // pièces à trouver pour un groupe de sets, sans compter deux fois le même stock
   const need = {}, locked = {};
@@ -2244,12 +2325,10 @@ function dl(name, rows) {
   a.download = name; document.body.appendChild(a); a.click(); a.remove();
 }
 
-function tryReserve(s) {
-  let short = 0, shortRaw = 0;
-  needsOf(s).forEach(n => { short += Math.max(0, n.qty - availFor(n.k, s.num)); shortRaw += Math.max(0, n.qty - stockQty(n.k)); });
-  if (!short) { s.reserved = true; _T = null; return true; }
-  showToast(short > shortRaw ? "Impossible : " + plural(short, "pièce") + " en moins (certaines sont déjà réservées par un autre set)" : "Impossible : il manque " + plural(short, "pièce"));
-  return false;
+function tryReserve(s) { // toujours possible : priorité aux réservations les plus anciennes
+  s.reserved = true; s.rsv = Date.now(); _T = null; const r = rsvStat(s);
+  showToast(r.got >= r.need ? "Pièces réservées 🔒" : "Réservé partiellement : " + r.got + "/" + r.need + " pièces (priorité par date de réservation)");
+  return true;
 }
 
 function addPieces(s) {
@@ -2263,11 +2342,11 @@ function addPieces(s) {
 }
 function addAllToStock(s) { // j'ai toutes les pièces de ce set : elles entrent au stock et sont réservées pour lui
   if (s.reserved && !confirm("Ce set est déjà réservé : ses pièces sont déjà dans ton stock. Les ajouter quand même ?")) return;
-  addPieces(s); s.reserved = true; if (s.manual === "built") s.manual = null; saveSets();
+  addPieces(s); if (!s.reserved) s.rsv = Date.now(); s.reserved = true; if (s.manual === "built") s.manual = null; saveSets();
   showToast("Pièces ajoutées et réservées pour ce set 🔒");
 }
 function consume(s) { // les pièces du set sortent du stock (set monté avec ces pièces)
-  needsOf(s).forEach(n => { let left = n.qty; stock.filter(x => canonK(x.k) === n.k).sort((a, b) => (b.k === n.p.k) - (a.k === n.p.k)).forEach(it => { const t = Math.min(it.qty, left); it.qty -= t; left -= t; }); });
+  const cmq = commitMap(); needsOf(s).forEach(n => { const al = cmq[n.k] && cmq[n.k].by[s.num] != null ? cmq[n.k].by[s.num] : n.qty; let left = Math.min(n.qty, al); stock.filter(x => canonK(x.k) === n.k).sort((a, b) => (b.k === n.p.k) - (a.k === n.p.k)).forEach(it => { const t = Math.min(it.qty, left); it.qty -= t; left -= t; }); });
   stock = stock.filter(x => x.qty > 0); save(); render();
 }
 function markBuilt(s) {
@@ -2278,7 +2357,7 @@ function dismantle(s) {
   if (!s.added) addPieces(s);
   s.added = false; s.reserved = false; s.manual = null; showToast("Set démonté : pièces remises au stock");
 }
-const invParts = j => aggParts((j.results || []).filter(p => !p.is_spare).map(p => ({ k: p.part.part_num + "|" + p.color.id, part: p.part.part_num, color: p.color.id, n: p.part.name, i: goodImg(p.part.part_img_url), st: p.part.part_cat_id === 58 || /sticker/i.test(p.part.name || ""), qty: p.quantity })));
+const invParts = j => aggParts((j.results || []).filter(p => !p.is_spare).map(p => ({ k: p.part.part_num + "|" + p.color.id, part: p.part.part_num, color: p.color.id, n: p.part.name, i: goodImg(p.part.part_img_url), st: p.part.part_cat_id === 58 || /^stickers?\b|sticker sheet/i.test(p.part.name || ""), qty: p.quantity })));
 async function refreshInv(s) {
   if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ⚙️ Paramètres");
   showToast("Mise à jour de l'inventaire…");
@@ -2300,7 +2379,7 @@ async function addSetToCollection(wish, dd) {
     const j = await r.json();
     const parts = invParts(j);
     setsCol.push({ num: d.set_num, name: d.name, img: d.set_img_url, year: d.year || "", manual: null, added: false, reserved: false, wish: !!wish, parts });
-    saveSets(); renderCollection(); if (dd) showToast("Ajouté à tes envies ⭐"); else openSetDetail(d.set_num);
+    saveSets(); renderCollection(); if (dd) showToast(wish ? "Ajouté à tes envies ⭐" : "Ajouté à ta collection ✓"); else openSetDetail(d.set_num);
   } catch(e) { showToast("Erreur : " + e.message); }
 }
 
@@ -2335,7 +2414,7 @@ function renderCollection() {
     const { c, miss, need, pct } = info.get(s), plur = miss > 1 ? "s" : "";
     const col = miss === 0 ? "var(--success)" : (pct > 50 ? "var(--warning)" : "var(--pt)");
     const almost = miss > 0 && (miss <= 10 || pct >= 95) && (c === "missing" || c === "wish");
-    const tag = hasConflict(s, ck) ? "⚠ Conflit de stock" : (c === "built" ? "🧱 Construit" + (s.added ? " · pièces au stock" : "") : (s.reserved ? "🔒 Pièces réservées" : (almost ? "🔥 Presque complet : " + plural(miss, "pièce") + " manquante" + plur : (miss ? plural(miss, "pièce") + " manquante" + plur + " · " + pct + "%" : "✓ " + (c === "wish" ? "Tu as déjà toutes les pièces" : "Pièces au complet")))));
+    const tag = hasConflict(s, ck) ? "⚠ Conflit de stock" : (c === "built" ? "🧱 Construit" + (s.added ? " · pièces au stock" : "") : (s.reserved ? rsvTag(s) : (almost ? "🔥 Presque complet : " + plural(miss, "pièce") + " manquante" + plur : (miss ? plural(miss, "pièce") + " manquante" + plur + " · " + pct + "%" : "✓ " + (c === "wish" ? "Tu as déjà toutes les pièces" : "Pièces au complet")))));
     return `<div class="set-card clk" data-open="${esc(s.num)}">
       <div class="set-header"><img src="${esc(s.img)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt="">
         <div class="grow"><div class="pn">${esc(s.name)}</div><div class="sub">Set N° ${esc(s.num)} · ${need} pièces</div><div class="meta" style="color:${hasConflict(s, ck) ? 'var(--warning)' : col}">${tag}</div></div></div>
@@ -2345,7 +2424,7 @@ function renderCollection() {
   };
   const mini = s => {
     const { c, miss, pct } = info.get(s), col = miss === 0 ? "var(--success)" : (pct > 50 ? "var(--warning)" : "var(--pt)");
-    const t = hasConflict(s, ck) ? "⚠ Conflit" : (c === "built" ? "🧱 Construit" : (s.reserved ? "🔒 Réservé" : (miss ? (miss <= 10 ? "🔥 " : "") + "−" + miss + " · " + pct + "%" : "✓ Complet")));
+    const t = hasConflict(s, ck) ? "⚠ Conflit" : (c === "built" ? "🧱 Construit" : (s.reserved ? rsvTag(s, 1) : (miss ? (miss <= 10 ? "🔥 " : "") + "−" + miss + " · " + pct + "%" : "✓ Complet")));
     return `<div class="fcard" data-open="${esc(s.num)}"><img src="${esc(s.img)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt=""><div class="fn">${esc(s.name)}</div>
       <div class="fm" style="color:${col}">${t}</div>${c === "built" ? "" : `<div class="progress-container" style="margin-top:6px"><div class="progress-bar" style="width:${pct}%; background:${col};"></div></div>`}</div>`;
   };
@@ -2378,51 +2457,52 @@ function applySetMode() {
 $("set-mode").onclick = e => { const b = e.target.closest("[data-sm]"); if (!b) return; setMode = b.dataset.sm; LSset("bs_setmode", setMode); applySetMode(); };
 function openSetDetail(num) { openNum = num; renderDetail(); lift("modal-set"); }
 function renderDetail() {
-  const s = findSet(openNum), box = $("modal-set-card"); if (!s) return;
+  const s = getSet(openNum), box = $("modal-set-card"); if (!s) return;
   const c = setCat(s), wish = c === "wish", built = c === "built", inModel = built && !s.added, clean = String(s.num).split("-")[0];
   const loose = s.parts.filter(p => !p.st), stick = s.parts.filter(p => p.st);
   const need = loose.reduce((n, p) => n + p.qty, 0), miss = inModel ? 0 : setMissing(s);
   const sts = [["auto", "Auto"], ["built", "Construit"], ["todo", "À construire"], ["missing", "À compléter"]];
-  const parts = loose.map(p => ({ p, av: inModel ? p.qty : Math.min(p.qty, availFor(p.k, s.num)), eq: !inModel && !!EQ[p.part] && stock.some(x => x.part !== p.part && x.color == p.color && canonK(x.k) === canonK(p.k)) }));
+  const parts = loose.map(p => { const av = inModel ? p.qty : Math.min(p.qty, availFor(p.k, s.num)); return { p, av, eq: !inModel && av > 0 && ((stock.find(x => x.k === p.k) || { qty: 0 }).qty < av) }; });
   parts.sort((a, b) => ((a.av >= a.p.qty) - (b.av >= b.p.qty)) * (partSort === "miss" ? 1 : -1));
   const nMiss = parts.filter(x => x.av < x.p.qty).length, shown = onlyMiss ? parts.filter(x => x.av < x.p.qty) : parts;
   box.innerHTML = `<div class="modal-header"><h3>${esc(s.name)}</h3><button class="icon-btn" data-d="close">✕</button></div>
     <div class="set-header"><img src="${esc(s.img)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt="">
       <div class="grow"><div class="sub">Set N° ${esc(s.num)}${s.year ? " · " + esc(s.year) : ""}</div><div class="meta">${need} pièces · ${loose.length} références</div>
-      <div class="meta" style="color:${miss ? 'var(--warning)' : 'var(--success)'}">${wish ? "⭐ Envie · " : ""}${built ? "🧱 Construit" + (s.added ? " · pièces au stock" : "") : (miss ? plural(miss, "pièce") + " manquante" + (miss > 1 ? "s" : "") : "✓ Pièces au complet")}${s.reserved ? " · 🔒 réservé" : ""}</div></div></div>
-    ${wish ? `<button class="btn pri full" style="margin-top:10px" data-d="tocol">⭐ Passer dans ma collection</button>` : `
+      <div class="meta" style="color:${miss ? 'var(--warning)' : 'var(--success)'}">${wish ? "⭐ Envie · " : ""}${built ? "🧱 Construit" + (s.added ? " · pièces au stock" : "") : (miss ? plural(miss, "pièce") + " manquante" + (miss > 1 ? "s" : "") : "✓ Pièces au complet")}${s.reserved ? " · " + rsvTag(s, 1) : ""}</div></div></div>
+    ${s.tmp ? `<div class="row" style="margin-top:10px"><button class="btn pri" data-d="tmpadd">➕ Ajouter à ma collection</button><button class="btn" data-d="tmpwish" style="flex:none">⭐ Envie</button></div>${s.msg ? `<div class="sub" style="margin-top:6px">${esc(s.msg)}</div>` : ""}` : wish ? `<button class="btn pri full" style="margin-top:10px" data-d="tocol">⭐ Passer dans ma collection</button>` : `
     <div class="sub" style="margin:10px 0 4px">Catégorie (Auto = selon ton stock)</div>
     <div class="seg" style="margin:0 0 10px">${sts.map(([v, l]) => `<button data-st="${v}" class="${(s.manual || "auto") === v ? 'on' : ''}" style="font-size:11px">${l}</button>`).join("")}</div>`}
     <div class="set-actions">
       <a href="https://www.lego.com/fr-fr/service/buildinginstructions/${esc(clean)}" target="_blank" rel="noopener" class="btn pri sm full">📄 Notice PDF</a>
       <a href="https://rebrickable.com/sets/${esc(s.num)}" target="_blank" rel="noopener" class="btn sm full">🌐 Rebrickable</a>
     </div>
-    ${wish ? "" : (built
+    ${wish || s.tmp ? "" : (built
       ? (s.added ? `<button class="btn full" style="margin-top:8px" data-d="unstock">📤 Retirer ses pièces du stock (set monté)</button>` : `<button class="btn full" style="margin-top:8px" data-d="dismantle">🔧 Démonter : remettre les pièces au stock</button>`)
       : `<button class="btn full" style="margin-top:8px" data-d="addall">📦 J'ai les pièces : les ajouter et les réserver</button>
          <button class="btn full ${s.reserved ? '' : 'pri'}" style="margin-top:6px" data-d="res">${s.reserved ? "Libérer les pièces" : "🔒 Réserver les pièces"}</button>`)}
-    ${miss || s.parts.some(p => !p.n) ? `<details style="margin-top:8px"><summary class="sub" style="cursor:pointer">Plus d'actions</summary>
+    ${s.tmp ? "" : miss || s.parts.some(p => !p.n) ? `<details style="margin-top:8px"><summary class="sub" style="cursor:pointer">Plus d'actions</summary>
       ${miss ? `<button class="btn sm full" style="margin-top:6px" data-d="eq">🔁 Vérifier les pièces équivalentes</button><button class="btn sm full" style="margin-top:6px" data-d="csv">📥 Exporter les manquants (CSV)</button>` : ""}
       ${s.parts.some(p => !p.n) ? `<button class="btn sm full" style="margin-top:6px" data-d="refresh">🔄 Mettre à jour l'inventaire (noms, autocollants)</button>` : ""}</details>` : ""}
     <div class="seg" style="margin:12px 0 6px"><button data-sort="miss" class="${partSort === "miss" ? 'on' : ''}">Manquantes d'abord</button><button data-sort="done" class="${partSort === "done" ? 'on' : ''}">Complètes d'abord</button></div>
     <button class="btn sm full ${onlyMiss ? "pri" : ""}" data-onlymiss="1" style="margin:0 0 6px">${onlyMiss ? "✓ " : ""}Manquantes uniquement (${nMiss})</button>
     ${onlyMiss && !shown.length ? '<div class="empty">Aucune pièce manquante 🎉</div>' : ""}
     <div class="set-parts-grid">${shown.map(({ p, av, eq }) => `<div class="set-part-item" ${inModel ? "" : `data-p="${esc(p.k)}" style="cursor:pointer"`}>
-      <span class="badge-status ${av >= p.qty ? 'has' : (av > 0 ? 'missing' : '')}"${eq ? ' title="Complété avec une pièce équivalente"' : ""}>${av}/${p.qty}${eq ? " ≈" : ""}</span>
+      <span class="badge-status ${av >= p.qty ? 'has' : (av > 0 ? 'missing' : '')}"${eq ? ' title="Complété avec une pièce équivalente (version unie ou imprimée)"' : ""}>${av}/${p.qty}${eq ? " ≈" : ""}</span>
       ${pImg(p.part, p.color, p.i)}
       <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
       <div style="color:var(--text-muted); font-size:10px; margin-top:2px;">${esc(colName(p.color))}</div></div>`).join("")}</div>
     ${stick.length ? `<div class="sub" style="margin:14px 0 6px">🏷 Autocollants (${stick.reduce((n, p) => n + p.qty, 0)})${built ? " · déjà posés" : ""}</div>
-    <div class="set-parts-grid">${stick.map(p => `<div class="set-part-item"><span class="badge-status ${built ? 'has' : ''}">${built ? "✓" : "×" + p.qty}</span>
-      ${goodImg(p.i) ? `<img src="${esc(p.i)}" alt="" referrerpolicy="no-referrer">` : pImg(p.part, p.color, "")}
+    <div class="set-parts-grid">${stick.map(p => `<div class="set-part-item" data-stk="${esc(p.part)}" style="cursor:pointer" title="Voir sur Rebrickable"><span class="badge-status ${built ? 'has' : ''}">${built ? "✓" : "×" + p.qty}</span>
+      <img src="${goodImg(p.i) ? esc(p.i) : STK_PH}" onerror="this.onerror=null;this.src=STK_PH" alt="" referrerpolicy="no-referrer">
       <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
       <div style="color:var(--text-muted); font-size:10px; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.n || "Autocollants")}</div></div>`).join("")}</div>` : ""}
-    <button class="btn sm full" style="margin-top:14px" data-d="del">Retirer de la collection</button>`;
+    ${s.tmp ? "" : `<button class="btn sm full" style="margin-top:14px" data-d="del">Retirer de la collection</button>`}`;
 }
 $("modal-set").onclick = e => {
   const ov = $("modal-set");
   if (e.target === ov) { ov.classList.remove("open"); renderCollection(); return; }
-  const s = findSet(openNum); if (!s) return;
+  const s = getSet(openNum); if (!s) return;
+  const sk = e.target.closest("[data-stk]"); if (sk) { window.open("https://rebrickable.com/parts/" + encodeURIComponent(sk.dataset.stk) + "/", "_blank", "noopener"); return; }
   const om = e.target.closest("[data-onlymiss]");
   if (om) { onlyMiss = !onlyMiss; LSset("bs_onlymiss", onlyMiss ? "1" : "0"); renderDetail(); return; }
   const pt = e.target.closest("[data-p]");
@@ -2433,6 +2513,7 @@ $("modal-set").onclick = e => {
   const d = e.target.closest("[data-d]"); if (!d) return;
   const a = d.dataset.d;
   if (a === "close") { ov.classList.remove("open"); renderCollection(); return; }
+  if (a === "tmpadd" || a === "tmpwish") { addTmpSet(s, a === "tmpwish"); return; }
   if (a === "addall") addAllToStock(s);
   else if (a === "built") { if (!markBuilt(s)) return; }
   else if (a === "dismantle") dismantle(s);
@@ -2452,6 +2533,7 @@ renderCollection();
 
 /* Fiche pièce du stock + saisie manuelle de quantité */
 const PH = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><g fill="#8b93a1"><rect x="4" y="18" width="40" height="22" rx="3"/><circle cx="14" cy="13" r="4"/><circle cx="24" cy="13" r="4"/><circle cx="34" cy="13" r="4"/></g></svg>');
+const STK_PH = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M8 6h24l8 8v28H8z" fill="#cfd5df" stroke="#8b93a1" stroke-width="2" stroke-linejoin="round"/><path d="M32 6v8h8" fill="#e6e9ef" stroke="#8b93a1" stroke-width="2" stroke-linejoin="round"/><circle cx="19" cy="24" r="5" fill="#ef4444"/><rect x="26" y="20" width="8" height="8" rx="2" fill="#3b82f6"/><path d="M15 36l4-5 4 5z" fill="#f59e0b"/><circle cx="31" cy="35" r="3" fill="#10b981"/></svg>');
 const goodImg = u => (u && !/nopic|no_image/i.test(u)) ? u : "";
 const pImg = (part, color, hint) => imgTag({ part, color, img: goodImg(hint) || PH });
 document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-part"><div class="modal-card" id="modal-part-card"></div></div><div class="modal-overlay" id="modal-qty"><div class="modal-card" id="modal-qty-card"></div></div>');
@@ -2474,15 +2556,16 @@ function renderPart() {
   const o = partObj, box = $("modal-part-card"); if (!o) return;
   const it = stock.find(x => x.k === o.k), qty = it ? it.qty : 0, name = (it && it.name) || o.name || o.part, img = (it && it.img) || o.img;
   const ck = canonK(o.k), q4 = s => (needsOf(s).find(n => n.k === ck) || { qty: 0 }).qty;
-  const users = setsCol.filter(isCommitted).map(s => ({ s, q: q4(s) })).filter(x => x.q > 0);
+  const cmo = commitMap()[ck] || { by: {} }, users = setsCol.filter(isCommitted).map(s => ({ s, q: q4(s), a: cmo.by[s.num] || 0 })).filter(x => x.q > 0);
   const inSets = setsCol.map(s => ({ s, q: q4(s) })).filter(x => x.q > 0);
   const inFigs = figs.map(f => ({ f, q: ((f.parts || []).find(p => p.part === o.part && p.color == o.color) || { qty: 0 }).qty })).filter(x => x.q > 0);
   const unk = figs.filter(f => !f.parts).length;
-  const res = users.reduce((n, x) => n + x.q, 0), free = Math.max(0, qty - res);
+  const res = users.reduce((n, x) => n + x.a, 0), free = Math.max(0, qty - res);
   const vars = stock.filter(x => x.part === o.part).sort((a, b) => b.qty - a.qty);
+  const eqv = stock.filter(x => x.part !== o.part && canonK(x.k) === ck).sort((a, b) => b.qty - a.qty);
   let ctx = "";
   if (partCtx && partCtx.need) {
-    const s = findSet(partCtx.setNum), miss = Math.max(0, partCtx.need - Math.max(0, qty - committedQty(o.k, partCtx.setNum)));
+    const s = getSet(partCtx.setNum), miss = Math.max(0, partCtx.need - Math.max(0, qty - committedQty(o.k, partCtx.setNum)));
     ctx = `<div class="set-card" style="margin-top:12px"><div class="meta">Pour « ${esc(s ? s.name : "")} » : ×${partCtx.need} nécessaire${partCtx.need > 1 ? "s" : ""}</div>
       ${miss ? `<button class="btn pri full" style="margin-top:6px" data-a="fill">J'ai tout : ajouter ${miss} pour compléter</button>` : '<div class="meta" style="color:var(--success)">✓ Tu as ce qu\'il faut</div>'}</div>`;
   }
@@ -2496,11 +2579,13 @@ function renderPart() {
       <div class="stat"><b>${res}</b><span>Réservées</span></div>
       <div class="stat"><b style="color:${free ? 'var(--success)' : 'var(--warning)'}">${free}</b><span>Libres</span></div></div>
     ${res > qty ? '<div class="sub" style="color:var(--warning);margin-top:6px">⚠ Plus de pièces réservées que de pièces en stock</div>' : ""}
-    ${users.length ? `<div class="sub" style="margin-top:8px">Réservées par : ${users.map(x => esc(x.s.name) + " ×" + x.q).join(", ")}</div>` : ""}
+    ${users.length ? `<div class="sub" style="margin-top:8px">Réservées par : ${users.map(x => esc(x.s.name) + " ×" + (x.a === x.q ? x.q : x.a + "/" + x.q)).join(", ")}</div>` : ""}
     ${inSets.length ? `<div class="sub" style="margin:14px 0 2px">Sets de ta collection qui l'utilisent (${inSets.length})</div>${inSets.map(x => row("data-os", x.s.num, (x.s.wish ? "⭐" : (x.s.manual === "built" ? "🧱" : "▫️")) + " " + esc(x.s.name) + " · ×" + x.q)).join("")}` : ""}
     ${inFigs.length || unk ? `<div class="sub" style="margin:14px 0 2px">Minifigs de ta collection qui l'utilisent (${inFigs.length})</div>${inFigs.map(x => row("data-fo2", x.f.num, "🧍 " + esc(x.f.name) + " · ×" + x.q + (x.f.qty > 1 ? " (tu en as " + x.f.qty + ")" : ""))).join("")}${unk ? `<div class="sub" style="margin-top:4px">${rbKey ? "Chargement du détail de " + plural(unk, "figurine") + "…" : plural(unk, "figurine") + " sans détail (clé Rebrickable requise)"}</div>` : ""}` : ""}
     ${vars.length > 1 ? `<div class="sub" style="margin:14px 0 6px">Couleurs en stock pour cette pièce (${vars.length})</div>
     <div class="vars">${vars.map(v => `<div class="var ${v.k === o.k ? 'on' : ''}" data-v="${esc(v.k)}">${pImg(v.part, v.color, v.img)}<div class="vn">${esc(colName(v.color))}</div><b>×${v.qty}</b></div>`).join("")}</div>` : ""}
+    ${eqv.length ? `<div class="sub" style="margin:14px 0 6px">≈ Versions équivalentes en stock (unie / imprimée) · comptent pour ce set (${eqv.length})</div>
+    <div class="vars">${eqv.map(v => `<div class="var" data-v="${esc(v.k)}">${pImg(v.part, v.color, v.img)}<div class="vn">${esc(v.part)}</div><b>×${v.qty}</b></div>`).join("")}</div>` : ""}
     <button class="btn sm full" style="margin-top:12px" data-a="allsets">🌐 Tous les sets LEGO avec cette pièce</button><div id="part-sets"></div>`;
   const on = box.querySelector(".var.on"); if (on) on.scrollIntoView({ inline: "center", block: "nearest" });
 }
@@ -2574,7 +2659,7 @@ async function fetchEquivs(parts, onProg) {
     try {
       let r = await fetch(url);
       if (r.status === 429) { await sleep(3000); r = await fetch(url); }
-      if (r.ok) { const j = await r.json(); b.forEach(p => { EQC[p] = []; }); (j.results || []).forEach(x => { EQC[x.part_num] = [...(x.alternates || []), ...(x.molds || [])]; }); }
+      if (r.ok) { const j = await r.json(); b.forEach(p => { EQC[p] = []; }); (j.results || []).forEach(x => { EQC[x.part_num] = [...(x.alternates || []), ...(x.molds || []), ...(x.print_of ? [x.print_of] : [])]; }); }
     } catch(e) {}
     await sleep(1100);
   }
@@ -2789,7 +2874,7 @@ async function setSuggest(q) {
     if (tok !== sgTok) return;
     let L = j.results || []; if (digits) L = L.filter(x => x.set_num.startsWith(q));
     L = L.sort((a, b) => b.year - a.year).slice(0, 12);
-    $("set-sugg").innerHTML = L.length ? L.map(x => `<div class="sg-row" data-sn="${esc(x.set_num)}">${figImg(x.set_img_url)}<div class="grow"><div class="pn">${esc(x.name)}</div><div class="sub">${esc(x.set_num)} · ${x.year} · ${x.num_parts} pièces</div></div></div>`).join("") : '<div class="sub" style="padding:10px">Aucun set trouvé.</div>';
+    sgList = L; renderSugg();
   } catch(e) { if (tok === sgTok) hideSugg(); }
 }
 $("q-set").oninput = () => {
@@ -2802,23 +2887,43 @@ $("btn-search-set").onclick = goSet;
 $("q-set").onkeydown = e => { if (e.key === "Enter") goSet(); };
 $("set-sugg").onclick = e => { const r = e.target.closest("[data-sn]"); if (r) { $("q-set").value = r.dataset.sn; sgTok++; hideSugg(); searchSet(); } };
 
-const ZF = { narrow: 0.4, normal: 0.6, wide: 1 };
-let zoneKey = LS("bs_zone") || "normal";
-$("vw-box").insertAdjacentHTML("beforeend", '<div id="scan-zone"></div>');
+const ZP = { narrow: [0.45, 0.55], normal: [0.65, 0.75], wide: [0.85, 0.92], full: [1, 1] }, ZORD = ["narrow", "normal", "wide", "full"], ZLAB = { narrow: "S", normal: "M", wide: "L", full: "Tout", custom: "Perso" };
+if (LS("bs_zone2") !== "1") { LSset("bs_zone", "wide"); LSset("bs_zone2", "1"); }
+let zoneKey = LS("bs_zone") || "wide"; if (!ZP[zoneKey] && zoneKey !== "custom") zoneKey = "wide";
+let zoneCustom = [0.85, 0.92]; try { const a = JSON.parse(LS("bs_zonecustom") || "null"); if (Array.isArray(a) && a.length === 2) zoneCustom = a; } catch(e) {}
+const zclamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const zoneFrac = () => zoneKey === "custom" ? zoneCustom : (ZP[zoneKey] || ZP.wide);
+$("vw-box").insertAdjacentHTML("beforeend", '<div id="scan-zone"></div><div class="zone-h" id="zone-h">⤡</div><button class="zone-chip" id="zone-chip"></button>');
 function updateZone() {
-  const box = $("vw-box"), z = $("scan-zone"), f = ZF[zoneKey] || 0.6;
+  const box = $("vw-box"), z = $("scan-zone"), h = $("zone-h"), chip = $("zone-chip"), [fw, fh] = zoneFrac();
   $("ap-zone").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === zoneKey));
-  const bw = box.clientWidth, bh = box.clientHeight; if (!bw || f >= 1) { z.style.display = "none"; return; }
-  const side = f * Math.min(bw, bh), left = Math.max(0, Math.min(bw - side, sampleX * bw - side / 2)), top = Math.max(0, Math.min(bh - side, sampleY * bh - side / 2));
-  z.style.cssText = "display:block;left:" + left + "px;top:" + top + "px;width:" + side + "px;height:" + side + "px";
+  chip.textContent = "▭ " + (ZLAB[zoneKey] || "");
+  const bw = box.clientWidth, bh = box.clientHeight;
+  if (!bw || (fw >= 1 && fh >= 1)) { z.style.display = "none"; h.style.display = "none"; return; }
+  const w = fw * bw, hh = fh * bh, left = zclamp(sampleX * bw - w / 2, 0, bw - w), top = zclamp(sampleY * bh - hh / 2, 0, bh - hh);
+  z.style.cssText = "display:block;left:" + left + "px;top:" + top + "px;width:" + w + "px;height:" + hh + "px";
+  h.style.display = "grid"; h.style.left = (left + w) + "px"; h.style.top = (top + hh) + "px";
 }
-function cropZone(c) { // ne garde que la zone autour de la cible : la pièce visée, pas celles du bord
-  const f = ZF[zoneKey] || 0.6; if (f >= 1) return c;
-  const side = Math.round(f * Math.min(c.width, c.height));
-  const left = Math.max(0, Math.min(c.width - side, Math.round(sampleX * c.width - side / 2))), top = Math.max(0, Math.min(c.height - side, Math.round(sampleY * c.height - side / 2)));
-  const z = document.createElement("canvas"); z.width = z.height = Math.max(side, 320);
-  z.getContext("2d").drawImage(c, left, top, side, side, 0, 0, z.width, z.height); return z;
+function cropZone(c) { // ne garde que le rectangle autour de la cible : la pièce visée, pas celles du bord
+  const [fw, fh] = zoneFrac(); if (fw >= 1 && fh >= 1) return c;
+  const w = Math.round(fw * c.width), h = Math.round(fh * c.height);
+  const left = zclamp(Math.round(sampleX * c.width - w / 2), 0, c.width - w), top = zclamp(Math.round(sampleY * c.height - h / 2), 0, c.height - h);
+  const k = Math.max(1, 320 / Math.min(w, h)), z = document.createElement("canvas"); z.width = Math.round(w * k); z.height = Math.round(h * k);
+  z.getContext("2d").drawImage(c, left, top, w, h, 0, 0, z.width, z.height); return z;
 }
+["click", "touchstart", "touchmove", "mousedown"].forEach(ev => { $("zone-h").addEventListener(ev, e => e.stopPropagation()); $("zone-chip").addEventListener(ev, e => e.stopPropagation()); });
+$("zone-chip").addEventListener("click", () => { const i = ZORD.indexOf(zoneKey); zoneKey = ZORD[(i + 1) % ZORD.length]; LSset("bs_zone", zoneKey); updateZone(); triggerHaptic(); });
+(function() { // poignée : étire le rectangle symétriquement autour du point visé
+  const h = $("zone-h"); let drag = false;
+  h.addEventListener("pointerdown", e => { drag = true; try { h.setPointerCapture(e.pointerId); } catch(err) {} e.preventDefault(); });
+  h.addEventListener("pointermove", e => {
+    if (!drag) return; const r = $("vw-box").getBoundingClientRect();
+    const fw = zclamp(2 * Math.abs(e.clientX - r.left - sampleX * r.width) / r.width, 0.25, 1), fh = zclamp(2 * Math.abs(e.clientY - r.top - sampleY * r.height) / r.height, 0.25, 1);
+    zoneKey = "custom"; zoneCustom = [fw, fh]; updateZone();
+  });
+  const end = () => { if (!drag) return; drag = false; LSset("bs_zone", "custom"); LSset("bs_zonecustom", JSON.stringify(zoneCustom)); };
+  h.addEventListener("pointerup", end); h.addEventListener("pointercancel", end);
+})();
 $("vw-box").addEventListener("click", updateZone);
 window.addEventListener("resize", updateZone);
 $("ap-zone").onclick = e => { const b = e.target.closest("button[data-v]"); if (!b) return; zoneKey = b.dataset.v; LSset("bs_zone", zoneKey); updateZone(); };
@@ -2972,6 +3077,7 @@ syncZoomBtns();
 torchReset();
 
 /* ---------- Panier de scan en rafale ---------- */
+document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-bk"><div class="modal-card" id="modal-bk-card"><div class="modal-header"><h3>Pièces à valider (<span id="bk-full-n">0</span>)</h3><button class="icon-btn" id="bk-full-close">✕</button></div><button class="btn pri full" id="bk-full-add" style="flex:none;margin-bottom:8px">📥 Tout ajouter au stock</button><div class="bk-full-body" id="bk-full-body"></div></div></div>');
 var rafOn = LS("bs_raf") === "1", rafLock = false, rafLockCol = null;
 var basket = [], undoBasket = null, bkAlt = null, bkHi = null, bkPick = null, bkId = Date.now(), bkCollapsed = LS("bs_bkcol") === "1";
 try { basket = JSON.parse(LS("bs_basket") || "[]").filter(b => b && b.part); } catch (e) { basket = []; }
@@ -3015,14 +3121,9 @@ function bkSwatches(b) {
     + `<span class="quick-swatch more" data-bpick="1" title="Toutes les couleurs">⋯</span><span class="sw-sep"></span>`
     + BK_TR.map(c => `<span class="quick-swatch trans ${c == b.color ? "active" : ""}" style="--c:${colRgb(c)}" title="${esc(colName(c))}" data-cid="${c}"></span>`).join("");
 }
-function renderBasket() {
-  const tot = basket.reduce((n, b) => n + b.qty, 0), body = $("bk-body"), keep = body.scrollTop;
-  $("bk-n").textContent = tot; $("bk-refs").textContent = basket.length > 1 ? " · " + basket.length + " réf." : "";
-  const nb = $("nav-badge"); nb.textContent = tot > 99 ? "99+" : tot; nb.classList.toggle("show", tot > 0);
-  $("bk-add").disabled = !basket.length;
-  $("basket").classList.toggle("col", bkCollapsed);
-  if (!basket.length) { body.innerHTML = '<div class="empty" style="padding:12px">Chaque photo prise avec « Scanner la pièce » s\'ajoute ici.<br>Corrige la couleur et la quantité, puis « Tout ajouter ».</div>'; return; }
-  body.innerHTML = basket.map(b => {
+function bkItemsHtml() {
+  if (!basket.length) return "";
+  return basket.map(b => {
     let sc = typeof b.score === "number" ? (b.score > 1 ? b.score : b.score * 100) : null; sc = sc === null ? null : Math.round(sc);
     const low = sc !== null && sc < 50, nocol = b.color === 9999;
     return `<div class="bk-item ${b.id === bkHi ? "hi" : ""} ${nocol ? "nocol" : ""}" data-id="${b.id}">
@@ -3034,7 +3135,7 @@ function renderBasket() {
           <div class="name">${esc(b.name)}</div>
           ${sc !== null ? `<div class="sub" style="font-size:11px;${low ? "color:var(--warning);font-weight:700" : ""}">${low ? "⚠ À vérifier · " : ""}confiance ${sc}%</div>` : ""}
         </div>
-        <div class="qstep"><button data-bq="-1">−</button><b>${b.qty}</b><button data-bq="1">+</button></div>
+        <div class="qstep"><button data-bq="-1">−</button><input class="qin" type="number" inputmode="numeric" min="1" data-bqi="1" value="${b.qty}"><button data-bq="1">+</button></div>
         <button class="bk-x" data-bdel="1" aria-label="Retirer">✕</button>
       </div>
       <div class="quick-swatches">${bkSwatches(b)}</div>
@@ -3042,7 +3143,19 @@ function renderBasket() {
       ${bkAlt === b.id ? `<div class="bk-alts">${b.alts.map((a, i) => `<div class="bk-altc" data-ba="${i}">${imgTag({ part: a.part, img: a.img, color: b.color })}<div>${esc(a.part)}</div></div>`).join("")}</div>` : ""}
     </div>`;
   }).join("") + `<button class="btn sm full" data-bclear="1" style="flex:none">🗑 Vider le panier</button>`;
-  bkHi = null; body.scrollTop = keep;
+}
+function bkCounts() {
+  const tot = basket.reduce((n, b) => n + b.qty, 0);
+  $("bk-n").textContent = tot; $("bk-full-n").textContent = tot; $("bk-refs").textContent = basket.length > 1 ? " · " + basket.length + " réf." : "";
+  const nb = $("nav-badge"); nb.textContent = tot > 99 ? "99+" : tot; nb.classList.toggle("show", tot > 0);
+  $("bk-add").disabled = !basket.length; $("bk-full-add").disabled = !basket.length;
+}
+function renderBasket() {
+  bkCounts(); $("basket").classList.toggle("col", bkCollapsed);
+  const html = bkItemsHtml(), bodies = [$("bk-body")];
+  if ($("modal-bk").classList.contains("open")) bodies.push($("bk-full-body"));
+  bodies.forEach(body => { const keep = body.scrollTop; body.innerHTML = html; body.scrollTop = keep; });
+  bkHi = null;
 }
 function bkMerge(b) { // même pièce + même couleur : on additionne
   const o = basket.find(x => x !== b && x.part === b.part && x.color === b.color);
@@ -3051,7 +3164,7 @@ function bkMerge(b) { // même pièce + même couleur : on additionne
 function basketAdd(cands, col, thumb, sug) {
   if (!cands.length) { st("Aucune pièce reconnue. Essaie sous un autre angle."); showToast("Aucune pièce reconnue"); return; }
   const top = cands[0], ex = basket.find(b => b.part === top.part && b.color === col);
-  if (ex) { ex.qty++; bkHi = ex.id; if (!ex.thumb) ex.thumb = thumb; }
+  if (ex) { ex.qty++; bkHi = ex.id; if (!ex.thumb) ex.thumb = thumb; basket = [ex, ...basket.filter(b => b !== ex)]; }
   else { const b = { id: ++bkId, part: top.part, name: top.name, img: top.img, color: col, qty: 1, score: top.score, alts: cands.slice(1), thumb, sug: sug || [] }; basket.unshift(b); bkHi = b.id; }
   bkSave(); renderBasket(); triggerHaptic();
   st((ex ? "+1 " : "Ajoutée : ") + top.part + " · " + (col === 9999 ? "couleur à choisir" : colName(col)) + " — " + basket.reduce((n, b) => n + b.qty, 0) + " en attente");
@@ -3069,21 +3182,21 @@ function basketCommit() {
   basket = basket.filter(b => b.color === 9999); bkSave();
   _T = null; save(); render(); renderCollection(); renderBasket(); triggerHaptic();
   $("undo-bar").firstElementChild.textContent = n + " pièce" + (n > 1 ? "s" : "") + " ajoutée" + (n > 1 ? "s" : "") + " au stock";
-  $("undo-bar").classList.add("show"); clearTimeout(undoT); undoT = setTimeout(() => $("undo-bar").classList.remove("show"), 10000);
+  $("undo-bar").classList.add("show"); clearTimeout(undoT); undoT = setTimeout(() => $("undo-bar").classList.remove("show"), 5000);
   if (bad) showToast(bad + " réf. sans couleur restent dans le panier");
 }
 $("bk-add").onclick = basketCommit;
 $("bk-tog").onclick = () => { bkCollapsed = !bkCollapsed; LSset("bs_bkcol", bkCollapsed ? "1" : "0"); renderBasket(); };
-$("bk-body").addEventListener("click", e => {
+function bkRow(e) { const row = e.target.closest(".bk-item"); return row ? basket.find(x => String(x.id) === row.dataset.id) : null; }
+function bkClick(e) {
   if (e.target.closest("[data-bclear]")) { if (basket.length && confirm("Vider le panier (" + basket.length + " réf.) ?")) { basket = []; bkSave(); renderBasket(); } return; }
-  const row = e.target.closest(".bk-item"); if (!row) return;
-  const b = basket.find(x => String(x.id) === row.dataset.id); if (!b) return;
+  const b = bkRow(e); if (!b || e.target.closest("input")) return;
   const q = e.target.closest("[data-bq]");
   if (q) { b.qty = Math.max(1, b.qty + +q.dataset.bq); bkSave(); renderBasket(); triggerHaptic(); return; }
   if (e.target.closest("[data-bdel]")) { basket = basket.filter(x => x !== b); bkSave(); renderBasket(); triggerHaptic(); return; }
   const sw = e.target.closest(".quick-swatch[data-cid]");
   if (sw) { b.color = +sw.dataset.cid; bkMerge(b); bkSave(); renderBasket(); triggerHaptic(); return; }
-  if (e.target.closest("[data-bpick]")) { bkPick = b.id; buildColorPickerGrid(); $("modal-color").classList.add("open"); return; }
+  if (e.target.closest("[data-bpick]")) { bkPick = b.id; buildColorPickerGrid(); lift("modal-color"); return; }
   if (e.target.closest("[data-balt]")) { bkAlt = bkAlt === b.id ? null : b.id; renderBasket(); return; }
   const al = e.target.closest("[data-ba]");
   if (al) {
@@ -3093,7 +3206,18 @@ $("bk-body").addEventListener("click", e => {
     bkMerge(b); bkSave(); renderBasket(); triggerHaptic(); return;
   }
   const pi = e.target.closest("[data-pi]"); if (pi && PIR[pi.dataset.pi]) openPartInfo(PIR[pi.dataset.pi]);
-});
+}
+const bkIsQty = e => e.target.matches && e.target.matches("[data-bqi]");
+function bkBind(el) {
+  el.addEventListener("click", bkClick);
+  el.addEventListener("input", e => { if (!bkIsQty(e)) return; const b = bkRow(e); if (!b) return; const v = parseInt(e.target.value, 10); b.qty = v > 0 ? v : 1; bkSave(); bkCounts(); });
+  el.addEventListener("change", e => { if (!bkIsQty(e)) return; const b = bkRow(e); if (b) e.target.value = b.qty; });
+  el.addEventListener("focusin", e => { if (bkIsQty(e)) setTimeout(() => e.target.select(), 0); });
+}
+bkBind($("bk-body")); bkBind($("bk-full-body"));
+$("bk-full").onclick = () => { lift("modal-bk"); renderBasket(); };
+$("bk-full-close").onclick = () => $("modal-bk").classList.remove("open");
+$("bk-full-add").onclick = () => { basketCommit(); if (!basket.length) $("modal-bk").classList.remove("open"); };
 // Sélecteur de couleur complet réutilisé pour une ligne du panier (phase de capture : passe avant le gestionnaire d'origine)
 $("modal-color").addEventListener("click", e => {
   if (bkPick == null) return;
@@ -3124,6 +3248,154 @@ $("s-figs").addEventListener("change", e => {
 $("coll-tools").style.display = (typeof setMode !== "undefined" && setMode === "coll" && setsCol.length) ? "" : "none";
 setRaf(rafOn, false);
 render(); renderCollection(); renderFigs();
+</script>
+<script>
+/* ===== BrickStock v3 : quantités, sets, minifigs scan, variantes imprimées ===== */
+
+/* ---------- Quantité au clavier (propositions du scan) ---------- */
+$("res").addEventListener("input", e => {
+  const i = e.target.dataset && e.target.dataset.qv; if (i === undefined) return;
+  const v = parseInt(e.target.value, 10); candQty[+i] = v > 0 ? v : 1;
+});
+$("res").addEventListener("focusin", e => { if (e.target.classList && e.target.classList.contains("qin")) setTimeout(() => e.target.select(), 0); });
+$("res").addEventListener("change", e => { const i = e.target.dataset && e.target.dataset.qv; if (i !== undefined) e.target.value = candQty[+i] || 1; });
+
+/* ---------- Raccourci clavier : Espace = scanner (ordinateur) ---------- */
+document.addEventListener("keydown", e => {
+  if (e.code !== "Space" || e.repeat) return;
+  const t = e.target; if (/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(t.tagName) || t.isContentEditable) return;
+  if (!$("s-scan").classList.contains("on") || document.querySelector(".modal-overlay.open")) return;
+  e.preventDefault(); scan();
+});
+
+/* ---------- Sets : recherche en lignes + fiche aperçu ---------- */
+var sgList = [];
+function renderSugg() {
+  $("set-sugg").innerHTML = sgList.length ? sgList.map((x, i) => {
+    const o = findSet(x.set_num);
+    return `<div class="sg-row" data-sn="${i}">${figImg(x.set_img_url)}<div class="grow"><div class="pn">${esc(x.name)}</div><div class="sub">${esc(x.set_num)} · ${x.year} · ${x.num_parts} pièces</div></div>
+      ${o ? `<span class="sg-tag">${o.wish ? "⭐ Envie" : "✓ Collection"}</span>` : `<button class="btn sm pri sg-add" data-sa="${i}">➕ Ajouter</button><button class="btn sm sg-add" data-sw="${i}" title="Ajouter aux envies">⭐</button>`}</div>`;
+  }).join("") : '<div class="sub" style="padding:10px">Aucun set trouvé.</div>';
+}
+$("set-sugg").onclick = e => {
+  const a = e.target.closest("[data-sa],[data-sw]");
+  if (a) { const wish = a.dataset.sw !== undefined, x = sgList[+(wish ? a.dataset.sw : a.dataset.sa)]; if (x) addSetToCollection(wish, x).then(renderSugg); return; }
+  const r = e.target.closest("[data-sn]"); if (r) { const x = sgList[+r.dataset.sn]; if (x) openSetPreview(x); }
+};
+async function openSetPreview(d) {
+  if (findSet(d.set_num)) { openSetDetail(d.set_num); return; }
+  setTmp = { num: d.set_num, name: d.name, img: d.set_img_url, year: d.year || "", manual: null, added: false, reserved: false, wish: false, parts: [], tmp: true,
+    msg: rbKey ? "Chargement de l'inventaire…" : "Ajoute ta clé Rebrickable dans ⚙️ Paramètres pour voir les pièces." };
+  const t = setTmp; openSetDetail(d.set_num);
+  if (!rbKey) return;
+  try {
+    if (!d.year || /^Set LEGO/.test(d.name || "")) { const j = await rb("sets/" + d.set_num + "/"); t.name = j.name || t.name; t.img = j.set_img_url || t.img; t.year = j.year || t.year; }
+    const j = await rb("sets/" + d.set_num + "/parts/?page_size=1000");
+    t.parts = invParts(j); t.msg = t.parts.length ? "" : "Aucune pièce trouvée pour ce set.";
+  } catch (e) { t.msg = "Erreur : " + e.message; }
+  if (setTmp === t && openNum === t.num) renderDetail();
+}
+async function searchSet() { // numéro saisi : ouvre directement la fiche (sans clé, on n'a que la notice)
+  const raw = $("q-set").value.trim(); if (!raw) return;
+  const num = raw.includes("-") ? raw : raw + "-1";
+  openSetPreview({ set_num: num, name: "Set LEGO " + num.split("-")[0], set_img_url: "https://cdn.rebrickable.com/media/sets/" + num.toLowerCase() + ".jpg", year: "" });
+}
+function addTmpSet(t, wish) {
+  if (!t.parts.length) return showToast("Inventaire non chargé (clé Rebrickable requise)");
+  if (findSet(t.num)) return;
+  setsCol.push({ num: t.num, name: t.name, img: t.img, year: t.year || "", manual: null, added: false, reserved: false, wish: !!wish, parts: t.parts });
+  setTmp = null; saveSets(); renderCollection(); renderDetail(); renderSugg();
+  showToast(wish ? "Ajouté à tes envies ⭐" : "Ajouté à ta collection ✓");
+}
+
+/* ---------- Pièces imprimées / autocollants : équivalences automatiques ---------- */
+if (LS("bs_eqv") !== "2") { EQC = {}; LSset("brickstock-equiv", "{}"); LSset("bs_eqv", "2"); buildEq(); _T = null; }
+var autoEqT = null;
+function autoEquivSoon() { clearTimeout(autoEqT); autoEqT = setTimeout(autoEquiv, 2500); }
+async function autoEquiv() {
+  if (eqBusy || !rbKey) return;
+  const rows = [];
+  setsCol.forEach(s => { if (s.manual === "built" && !s.added) return; needsOf(s).forEach(n => { if (n.qty > availFor(n.k, s.num)) rows.push(n.p.part); }); });
+  const todo = [...new Set(rows)].filter(p => !(p in EQC)); if (!todo.length) return;
+  eqBusy = true;
+  try { await fetchEquivs(todo, () => {}); } catch (e) {}
+  eqBusy = false; _T = null; renderCollection();
+  if ($("modal-set").classList.contains("open")) renderDetail();
+}
+setInterval(autoEquivSoon, 60000); autoEquivSoon();
+
+/* ---------- Minifigs : scan d'une figurine ---------- */
+document.body.insertAdjacentHTML("beforeend", `<div class="modal-overlay" id="modal-figscan"><div class="modal-card" id="modal-figscan-card">
+  <div class="modal-header"><h3>📷 Scanner une minifig</h3><button class="icon-btn" id="fs-close">✕</button></div>
+  <div class="fsv-box"><video id="fsv" playsinline muted autoplay></video></div>
+  <div class="row" style="margin:8px 0"><button class="btn pri" id="fs-snap">📷 Scanner</button><button class="btn" id="fs-file" style="flex:none">📁 Photo</button></div>
+  <input type="file" id="fs-input" accept="image/*" style="display:none">
+  <div id="fs-status" class="sub" style="text-align:center;margin-bottom:6px"></div>
+  <div id="fs-res" class="fs-list"></div><div id="fs-match" class="fs-list"></div></div></div>`);
+var fsStream = null, fsCands = [], fsMatches = [], fsBusy = false;
+async function fsStart() {
+  try { fsStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false }); }
+  catch (e) { try { fsStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); } catch (e2) { $("fs-status").textContent = "Caméra indisponible : utilise « 📁 Photo »."; return; } }
+  const v = $("fsv"); v.srcObject = fsStream; try { await v.play(); } catch (e) {}
+}
+function fsStop() { if (fsStream) { fsStream.getTracks().forEach(t => t.stop()); fsStream = null; } $("fsv").srcObject = null; }
+$("fig-scan").onclick = () => { fsCands = []; fsMatches = []; $("fs-res").innerHTML = ""; $("fs-match").innerHTML = ""; $("fs-status").textContent = ""; lift("modal-figscan"); fsStart(); };
+$("fs-close").onclick = () => $("modal-figscan").classList.remove("open");
+new MutationObserver(() => { if (!$("modal-figscan").classList.contains("open")) fsStop(); }).observe($("modal-figscan"), { attributes: true, attributeFilter: ["class"] });
+async function fsSend(blob) {
+  if (fsBusy) return; fsBusy = true; $("fs-status").textContent = "Analyse en cours…"; $("fs-res").innerHTML = ""; $("fs-match").innerHTML = "";
+  try {
+    let items = null;
+    for (const ep of ["figs", ""]) {
+      const fd = new FormData(); fd.append("query_image", blob, "frame.jpg");
+      const r = await fetch("https://api.brickognize.com/predict/" + (ep ? ep + "/" : ""), { method: "POST", body: fd });
+      if (!r.ok) continue;
+      items = ((await r.json()).items || []); if (!ep) items = items.filter(x => !x.type || x.type === "fig"); break;
+    }
+    if (!items) throw new Error("service indisponible");
+    fsCands = items.slice(0, 5); $("fs-status").textContent = fsCands.length ? "" : "Aucune minifig reconnue. Essaie sous un autre angle."; renderFsRes();
+  } catch (e) { $("fs-status").textContent = "Erreur : " + e.message; }
+  fsBusy = false;
+}
+function fsFromCanvas(c) { c.toBlob(b => fsSend(b), "image/jpeg", 0.85); }
+$("fs-snap").onclick = () => {
+  const v = $("fsv"); if (!fsStream || !v.videoWidth) return showToast("Caméra non prête");
+  const k = Math.min(1, 900 / v.videoWidth), c = document.createElement("canvas"); c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height); triggerHaptic(); fsFromCanvas(c);
+};
+$("fs-file").onclick = () => $("fs-input").click();
+$("fs-input").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try { const bmp = await createImageBitmap(f), k = Math.min(1, 900 / bmp.width), c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height); fsFromCanvas(c); }
+  catch (err) { $("fs-status").textContent = "Image illisible : " + err.message; }
+};
+function renderFsRes() {
+  $("fs-res").innerHTML = fsCands.map((c, i) => {
+    const sc = typeof c.score === "number" ? Math.round(c.score > 1 ? c.score : c.score * 100) : null;
+    return `<div class="sg-row" data-fc="${i}">${figImg(c.img_url)}<div class="grow"><div class="pn">${esc(c.name)}</div><div class="sub">${esc(c.id)}${sc !== null ? " · " + sc + "%" : ""}</div></div><button class="btn sm pri sg-add" data-fc="${i}">➕ Ajouter</button></div>`;
+  }).join("");
+}
+function renderFsMatch() {
+  $("fs-match").innerHTML = fsMatches.length ? '<div class="sub" style="padding:8px 10px 0">Choisis la bonne fiche :</div>' + fsMatches.map((r, i) => `<div class="sg-row" data-fma="${i}">${figImg(r.set_img_url)}<div class="grow"><div class="pn">${esc(r.name)}</div><div class="sub">${esc(r.set_num)} · ${r.num_parts} pièces</div></div><button class="btn sm pri sg-add" data-fma="${i}">➕</button></div>`).join("") : "";
+}
+async function fsResolve(c) {
+  if (!c) return; if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ⚙️ Paramètres");
+  $("fs-match").innerHTML = '<div class="sub" style="padding:10px">Recherche de la fiche Rebrickable…</div>';
+  const name = c.name || "", qs = [c.id, name, name.replace(/[^\p{L}\p{N}]+/gu, " ").trim(), name.split(/[\s,\-–]+/).filter(Boolean).slice(0, 2).join(" ")].filter((q, i, a) => q && a.indexOf(q) === i);
+  let res = [];
+  for (const q of qs) { try { res = (await rb("minifigs/?search=" + encodeURIComponent(q) + "&page_size=8")).results || []; } catch (e) { res = []; } if (res.length) break; }
+  fsMatches = res;
+  if (!res.length) { $("fs-match").innerHTML = '<div class="sub" style="padding:10px">Aucune fiche trouvée sur Rebrickable pour cette minifig.</div>'; return; }
+  renderFsMatch();
+}
+$("fs-res").onclick = e => { const r = e.target.closest("[data-fc]"); if (r) fsResolve(fsCands[+r.dataset.fc]); };
+$("fs-match").onclick = async e => {
+  const a = e.target.closest("[data-fma]"); if (!a) return; const r = fsMatches[+a.dataset.fma]; if (!r) return;
+  await addFig(r); fsCands = []; fsMatches = []; $("fs-res").innerHTML = ""; $("fs-match").innerHTML = ""; $("fs-status").textContent = "✓ " + r.name + " ajoutée. Scanne la suivante.";
+};
+
+/* ---------- Initialisation ---------- */
+renderSugg();
 </script>
 </body>
 </html>
