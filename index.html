@@ -3604,5 +3604,113 @@ applySetMode();
   }, true);
 })();
 </script>
+<script>
+/* BrickStock : (1) au scan, propose les pièces de tes sets qui ressemblent ; (2) « 🔎 Chercher dans mon stock » depuis une pièce d'un set */
+(function () {
+  var STOP = { with: 1, and: 1, the: 1, of: 1, for: 1, to: 1, in: 1, on: 1, no: 1, x: 1 };
+  var tok = function (n) { return String(n || "").toLowerCase().split(/[^a-z0-9]+/).filter(function (t) { return t && !STOP[t]; }); };
+  function missingFor(col) {
+    var out = [];
+    setsCol.forEach(function (s) {
+      if (s.wish || setCat(s) === "built") return;
+      needsOf(s).forEach(function (n) { if (n.p.color == col && n.p.n && n.qty > availFor(n.k, s.num)) out.push({ part: n.p.part, name: n.p.n, img: n.p.i, set: s.name }); });
+    });
+    return out;
+  }
+  function setSug(cands, col) {
+    if (col === 9999 || col == null) return [];
+    var have = {}, seen = {}, res = [];
+    cands.forEach(function (c) { have[c.part] = 1; });
+    missingFor(col).forEach(function (m) {
+      if (have[m.part] || seen[m.part]) return;
+      var a = tok(m.name), best = 0;
+      cands.forEach(function (c) {
+        var b = tok(c.name), inter = a.filter(function (t) { return b.indexOf(t) >= 0; });
+        if (!inter.length || !inter.some(function (t) { return t.length >= 4 && !/^\d+$/.test(t); })) return;
+        var s = inter.length / Math.min(a.length, b.length); if (s > best) best = s;
+      });
+      if (best >= 0.6) { seen[m.part] = 1; res.push({ m: m, s: best }); }
+    });
+    return res.sort(function (x, y) { return y.s - x.s; }).slice(0, 2).map(function (x) { return x.m; });
+  }
+
+  /* (1a) mode normal : lignes sous les propositions */
+  var _rr = renderRes;
+  renderRes = function () {
+    _rr();
+    try {
+      var L = cand.length ? setSug(cand, curCol) : []; window.__ssg = L;
+      if (L.length) $("res").insertAdjacentHTML("beforeend", L.map(function (m, i) {
+        return '<div class="cand-card" style="border-color:var(--success)">' + imgTag({ part: m.part, color: curCol, img: m.img }) + '<div class="grow"><div class="pn">' + esc(m.part) + '</div><div class="name">' + esc(m.name) + '</div><div class="sub" style="color:var(--success);font-weight:700">🧩 Ou plutôt cette pièce ? Elle manque dans « ' + esc(m.set) + ' »</div></div><button class="btn pri" data-ssg="' + i + '">+ Ajouter</button></div>';
+      }).join(""));
+    } catch (e) {}
+  };
+  $("res").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-ssg]"); if (!b) return; var m = (window.__ssg || [])[+b.dataset.ssg]; if (!m) return;
+    add(m.part, m.name, m.img, curCol, 1); b.textContent = "Ajouté ✓"; b.style.background = "#10b981"; b.style.borderColor = "#10b981";
+  });
+
+  /* (1b) mode rafale : bouton sous la ligne du panier */
+  var _ba = basketAdd;
+  basketAdd = function (c, col, th, sug) {
+    var top = c && c[0]; _ba(c, col, th, sug);
+    try { var b = top && basket.find(function (x) { return x.part === top.part && x.color === col; }); if (b && c.length) { var L = setSug(c, col); b.setSug = L.length ? L[0] : null; renderBasket(); } } catch (e) {}
+  };
+  var _rb = renderBasket;
+  renderBasket = function () {
+    _rb();
+    document.querySelectorAll(".bk-item[data-id]").forEach(function (el) {
+      var b = basket.find(function (x) { return String(x.id) === el.dataset.id; });
+      if (b && b.setSug && b.setSug.part !== b.part && !el.querySelector(".bk-ss")) { var t = el.querySelector(".bk-top"); if (t) t.insertAdjacentHTML("afterend", '<button class="btn sm full bk-ss" data-bss="' + b.id + '" style="margin-top:6px;border-color:var(--success);color:var(--success)">🧩 Ou plutôt <b>' + esc(b.setSug.part) + '</b> ? Manque dans « ' + esc(b.setSug.set) + ' »</button>'); }
+    });
+  };
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest && e.target.closest("[data-bss]"); if (!t) return; e.stopPropagation();
+    var b = basket.find(function (x) { return String(x.id) === t.dataset.bss; }); if (!b || !b.setSug) return; var m = b.setSug;
+    b.alts = [{ part: b.part, name: b.name, img: b.img, score: b.score }].concat(b.alts || []);
+    b.part = m.part; b.name = m.name; b.img = m.img; b.setSug = null; bkSave(); renderBasket(); triggerHaptic();
+  }, true);
+
+  /* (2) « Chercher dans mon stock » : lie une pièce de ton stock à celle que le set demande */
+  var EQM = {}; try { EQM = JSON.parse(localStorage.getItem("bs_eqm") || "{}"); } catch (e) {}
+  var _be = buildEq;
+  buildEq = function () { Object.keys(EQM).forEach(function (p) { EQC[p] = Array.from(new Set((EQC[p] || []).concat(EQM[p]))); }); _be(); };
+  buildEq(); _T = null;
+  var eqs = { part: "", color: 0, all: false, q: "" };
+  document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-eqpick"><div class="modal-card" id="modal-eqpick-card"></div></div>');
+  function eqRows() {
+    var q = eqs.q.toLowerCase();
+    var rows = stock.filter(function (x) { return x.part !== eqs.part && (eqs.all || x.color == eqs.color) && (!q || (x.part + " " + x.name).toLowerCase().indexOf(q) >= 0); }).sort(function (a, b) { return b.qty - a.qty; }).slice(0, 80);
+    $("eqp-list").innerHTML = rows.length ? rows.map(function (x) { return '<div class="card" data-eqk="' + esc(x.k) + '" style="cursor:pointer">' + imgTag(x) + '<div class="grow"><div class="pn">' + esc(x.part) + '</div><div class="name">' + esc(x.name) + '</div><div class="cl1"><span class="sw" style="background:' + colRgb(x.color) + '"></span>' + esc(colName(x.color)) + '</div></div><div class="qlab">×' + x.qty + '</div></div>'; }).join("") : '<div class="empty">Aucune pièce trouvée.</div>';
+  }
+  function eqOpen() {
+    var lk = EQM[eqs.part] || [];
+    $("modal-eqpick-card").innerHTML = '<div class="modal-header"><h3>🔎 Dans mon stock</h3><button class="icon-btn" data-eqx="close">✕</button></div>' +
+      '<div class="sub">Choisis la pièce de ton stock qui correspond à <b>' + esc(eqs.part) + '</b> (' + esc(colName(eqs.color)) + '). Elle comptera pour tes sets.</div>' +
+      (lk.length ? '<div class="sub" style="margin-top:8px">Déjà liées : ' + lk.map(function (p) { return esc(p) + ' <a href="#" data-equn="' + esc(p) + '">✕ retirer</a>'; }).join(" · ") + '</div>' : "") +
+      '<input id="eqp-q" type="search" placeholder="Filtrer (n° ou nom)…" style="margin:10px 0 6px"><div id="eqp-list"></div>';
+    eqRows(); lift("modal-eqpick");
+  }
+  var _rp = renderPart;
+  renderPart = function () {
+    _rp();
+    try { if (partCtx && partCtx.need && partObj) { var c = $("modal-part-card").querySelector(".set-card"); if (c) c.insertAdjacentHTML("beforeend", '<button class="btn sm full" data-eqs="1" style="margin-top:6px">🔎 Chercher dans mon stock</button>'); } } catch (e) {}
+  };
+  $("modal-part").addEventListener("click", function (e) { if (e.target.closest("[data-eqs]") && partObj) { eqs = { part: partObj.part, color: partObj.color, all: false, q: "" }; eqOpen(); } });
+  $("modal-eqpick").addEventListener("input", function (e) { if (e.target.id === "eqp-q") { eqs.q = e.target.value; eqRows(); } });
+  $("modal-eqpick").addEventListener("change", function (e) { if (e.target.id === "eqp-all") { eqs.all = e.target.checked; eqRows(); } });
+  $("modal-eqpick").addEventListener("click", function (e) {
+    if (e.target === $("modal-eqpick") || e.target.closest("[data-eqx]")) { $("modal-eqpick").classList.remove("open"); return; }
+    var un = e.target.closest("[data-equn]");
+    if (un) { e.preventDefault(); EQM[eqs.part] = (EQM[eqs.part] || []).filter(function (p) { return p !== un.dataset.equn; }); localStorage.setItem("bs_eqm", JSON.stringify(EQM)); EQC[eqs.part] = (EQC[eqs.part] || []).filter(function (p) { return p !== un.dataset.equn; }); buildEq(); _T = null; eqOpen(); refresh(); return; }
+    var r = e.target.closest("[data-eqk]"); if (!r) return; var it = stock.find(function (x) { return x.k === r.dataset.eqk; }); if (!it) return;
+    EQM[eqs.part] = Array.from(new Set((EQM[eqs.part] || []).concat(it.part))); localStorage.setItem("bs_eqm", JSON.stringify(EQM));
+    buildEq(); _T = null; $("modal-eqpick").classList.remove("open"); refresh();
+    showToast(it.part + " compte maintenant pour " + eqs.part);
+  });
+  function refresh() { render(); renderCollection(); if ($("modal-set").classList.contains("open")) renderDetail(); renderPart(); }
+})();
+</script>
+
 </body>
 </html>
