@@ -3623,6 +3623,8 @@ applySetMode();
     cands.forEach(function (c) { have[c.part] = 1; });
     missingFor(col).forEach(function (m) {
       if (have[m.part] || seen[m.part]) return;
+      var cc = canonPart(m.part);
+      if (cands.some(function (c) { return c.part !== m.part && canonPart(c.part) === cc; })) { seen[m.part] = 1; res.push({ m: { part: m.part, name: m.name, img: m.img, set: m.set, exact: 1 }, s: 2 }); return; }
       var a = tok(m.name), best = 0;
       cands.forEach(function (c) {
         var b = tok(c.name), inter = a.filter(function (t) { return b.indexOf(t) >= 0; });
@@ -3640,8 +3642,8 @@ applySetMode();
     _rr();
     try {
       var L = cand.length ? setSug(cand, curCol) : []; window.__ssg = L;
-      if (L.length) $("res").insertAdjacentHTML("beforeend", L.map(function (m, i) {
-        return '<div class="cand-card" style="border-color:var(--success)">' + imgTag({ part: m.part, color: curCol, img: m.img }) + '<div class="grow"><div class="pn">' + esc(m.part) + '</div><div class="name">' + esc(m.name) + '</div><div class="sub" style="color:var(--success);font-weight:700">🧩 Ou plutôt cette pièce ? Elle manque dans « ' + esc(m.set) + ' »</div></div><button class="btn pri" data-ssg="' + i + '">+ Ajouter</button></div>';
+      if (L.length) $("res").insertAdjacentHTML(L[0].exact ? "afterbegin" : "beforeend", L.map(function (m, i) {
+        return '<div class="cand-card" style="border-color:var(--success)">' + imgTag({ part: m.part, color: curCol, img: m.img }) + '<div class="grow"><div class="pn">' + esc(m.part) + '</div><div class="name">' + esc(m.name) + '</div><div class="sub" style="color:var(--success);font-weight:700">' + (m.exact ? '✅ Même pièce, numéro utilisé par « ' + esc(m.set) + ' »' : '🧩 Ou plutôt cette pièce ? Elle manque dans « ' + esc(m.set) + ' »') + '</div></div><button class="btn pri" data-ssg="' + i + '">+ Ajouter</button></div>';
       }).join(""));
     } catch (e) {}
   };
@@ -3654,7 +3656,7 @@ applySetMode();
   var _ba = basketAdd;
   basketAdd = function (c, col, th, sug) {
     var top = c && c[0]; _ba(c, col, th, sug);
-    try { var b = top && basket.find(function (x) { return x.part === top.part && x.color === col; }); if (b && c.length) { var L = setSug(c, col); b.setSug = L.length ? L[0] : null; renderBasket(); } } catch (e) {}
+    try { var b = top && basket.find(function (x) { return x.part === top.part && x.color === col; }); if (b && c.length) { var L = setSug(c, col), m = L.length ? L[0] : null; if (m && m.exact) { b.alts = [{ part: b.part, name: b.name, img: b.img, score: b.score }].concat(b.alts || []); b.part = m.part; b.name = m.name; b.img = m.img; b.setSug = null; bkSave(); } else b.setSug = m; renderBasket(); } } catch (e) {}
   };
   var _rb = renderBasket;
   renderBasket = function () {
@@ -3688,7 +3690,7 @@ applySetMode();
     $("modal-eqpick-card").innerHTML = '<div class="modal-header"><h3>🔎 Dans mon stock</h3><button class="icon-btn" data-eqx="close">✕</button></div>' +
       '<div class="sub">Choisis la pièce de ton stock qui correspond à <b>' + esc(eqs.part) + '</b> (' + esc(colName(eqs.color)) + '). Elle comptera pour tes sets.</div>' +
       (lk.length ? '<div class="sub" style="margin-top:8px">Déjà liées : ' + lk.map(function (p) { return esc(p) + ' <a href="#" data-equn="' + esc(p) + '">✕ retirer</a>'; }).join(" · ") + '</div>' : "") +
-      '<input id="eqp-q" type="search" placeholder="Filtrer (n° ou nom)…" style="margin:10px 0 6px"><div id="eqp-list"></div>';
+      '<input id="eqp-q" type="search" placeholder="Filtrer (n° ou nom)…" style="margin:10px 0 6px"><label class="chk" style="margin:0 0 8px"><input type="checkbox" id="eqp-all"> Toutes les couleurs</label><div id="eqp-list"></div>';
     eqRows(); lift("modal-eqpick");
   }
   var _rp = renderPart;
@@ -3709,6 +3711,74 @@ applySetMode();
     showToast(it.part + " compte maintenant pour " + eqs.part);
   });
   function refresh() { render(); renderCollection(); if ($("modal-set").classList.contains("open")) renderDetail(); renderPart(); }
+})();
+</script>
+
+<script>
+/* BrickStock : au scan, traduit le numéro BrickLink/LDraw (ex. 3684c) en numéro Rebrickable (ex. 98560), même sans set */
+(function () {
+  var MAP = {}; try { MAP = JSON.parse(localStorage.getItem("bs_rbmap") || "{}"); } catch (e) {}
+  var pend = {};
+  function resolve(id) {   /* → Promise<{part,name}|null> ; null = identique ou inconnu */
+    if (id in MAP) return Promise.resolve(MAP[id]);
+    if (!rbKey) return Promise.resolve(null);
+    if (pend[id]) return pend[id];
+    return pend[id] = rb("parts/?bricklink_id=" + encodeURIComponent(id) + "&page_size=5").then(function (j) {
+      var r = (j.results || []), v = null;
+      if (r.length === 1 && r[0].part_num !== id) v = { part: r[0].part_num, name: r[0].name };
+      MAP[id] = v; localStorage.setItem("bs_rbmap", JSON.stringify(MAP)); return v;
+    }).catch(function () { return null; }).then(function (v) { delete pend[id]; return v; });
+  }
+  function run(list, apply) {   /* résout les 3 premiers éléments non encore traités, l'un après l'autre */
+    var todo = list.slice(0, 3).filter(function (c) { return !c._rr; }); if (!todo.length) return;
+    todo.forEach(function (c) { c._rr = 1; });
+    var changed = false, p = Promise.resolve();
+    todo.forEach(function (c) {
+      p = p.then(function () { return resolve(c.part); }).then(function (v) {
+        if (v && v.part !== c.part) { c.alias = c.part; c.part = v.part; if (v.name) c.name = v.name; changed = true; }
+      });
+    });
+    p.then(function () { if (changed) apply(); });
+  }
+  var _rr = renderRes;
+  renderRes = function () { _rr(); try { var arr = cand; run(arr, function () { if (cand === arr) renderRes(); }); } catch (e) {} };
+  var _ba = basketAdd;
+  basketAdd = function (c, col, th, sug) {
+    var top = c && c[0]; _ba(c, col, th, sug);
+    try {
+      var b = top && basket.find(function (x) { return x.part === top.part && x.color === col; }); if (!b) return;
+      var all = [b].concat(b.alts || []); run(all, function () { b.setSug = null; bkSave(); renderBasket(); });
+    } catch (e) {}
+  };
+})();
+</script>
+
+<script>
+/* BrickStock : relie automatiquement les numéros d'une même pièce (ex. 3684c BrickLink/LDraw = 98560 Rebrickable) */
+(function () {
+  if (LS("bs_eqv") !== "3") { EQC = {}; LSset("brickstock-equiv", "{}"); LSset("bs_eqv", "3"); buildEq(); _T = null; }
+  fetchEquivs = async function (parts, onProg) {
+    var todo = Array.from(new Set(parts)).filter(function (p) { return !(p in EQC); });
+    for (var i = 0; i < todo.length; i += 40) {
+      var b = todo.slice(i, i + 40); onProg(Math.min(i + 40, todo.length), todo.length);
+      var url = "https://rebrickable.com/api/v3/lego/parts/?part_nums=" + b.map(encodeURIComponent).join(",") + "&inc_part_details=1&page_size=100&key=" + rbKey;
+      try {
+        var r = await fetch(url);
+        if (r.status === 429) { await sleep(3000); r = await fetch(url); }
+        if (r.ok) {
+          var j = await r.json(); b.forEach(function (p) { EQC[p] = []; });
+          (j.results || []).forEach(function (x) {
+            var L = (x.alternates || []).concat(x.molds || [], x.print_of ? [x.print_of] : []), ex = x.external_ids || {};
+            ["BrickLink", "LDraw"].forEach(function (k) { (ex[k] || []).forEach(function (id) { id = String(id); if (id && id !== x.part_num) L.push(id); }); });
+            EQC[x.part_num] = Array.from(new Set(L));
+          });
+        }
+      } catch (e) {}
+      await sleep(1100);
+    }
+    LSset("brickstock-equiv", JSON.stringify(EQC)); buildEq(); _T = null;
+  };
+  autoEquivSoon();
 })();
 </script>
 
@@ -3836,9 +3906,9 @@ applySetMode();
 <script>
 /* BrickStock : appui long (1 s) sur une pièce du stock → changer la couleur / supprimer, avec bouton Annuler */
 (function () {
-  document.head.insertAdjacentHTML("beforeend", '<style>#list .card,#list .scard{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#list img{pointer-events:none;-webkit-touch-callout:none}@keyframes lphold{from{box-shadow:inset 0 0 0 0 transparent}to{box-shadow:inset 0 0 0 3px rgba(255,255,255,.6)}}.lp-hold{animation:lphold .75s linear .25s forwards}#undo-bar{position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:999999;display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#2a2f3a;color:#fff;border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 30px rgba(0,0,0,.5)}#undo-bar button{background:none;border:0;color:#fbbf24;font-weight:800;font-size:15px}</style>');
+  document.head.insertAdjacentHTML("beforeend", '<style>#list .card,#list .scard{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#list img{pointer-events:none;-webkit-touch-callout:none}@keyframes lphold{from{box-shadow:inset 0 0 0 0 transparent}to{box-shadow:inset 0 0 0 3px rgba(255,255,255,.6)}}.lp-hold{animation:lphold .5s linear .2s forwards}#undo-bar{position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:999999;display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#2a2f3a;color:#fff;border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 30px rgba(0,0,0,.5)}#undo-bar button{background:none;border:0;color:#fbbf24;font-weight:800;font-size:15px}</style>');
   document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-stkm"><div class="modal-card" id="modal-stkm-card"></div></div><div id="undo-bar"><span id="undo-msg"></span><button id="undo-btn">Annuler</button></div>');
-  var LP = 1000, t = null, sx = 0, sy = 0, el = null, last = 0, cur = null, armed = false, pick = null, snap = null, ut = null;
+  var LP = 700, t = null, sx = 0, sy = 0, el = null, last = 0, cur = null, armed = false, pick = null, snap = null, ut = null;
   var list = $("list");
   function clear() { if (t) { clearTimeout(t); t = null; } if (el) { el.classList.remove("lp-hold"); el = null; } }
   list.addEventListener("pointerdown", function (e) {
