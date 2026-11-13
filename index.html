@@ -3771,6 +3771,17 @@ applySetMode();
     if (known[id] || !/^[0-9a-f]{6}$/i.test(hex || "") || /^\[/.test(en)) return false;
     known[id] = 1; META[id] = { en: en, trans: !!trans }; COLORS.push([id, name || fr(en), hex.toUpperCase()]); return true;
   }
+  var COMMON = [0, 15, 71, 72, 4, 1, 14, 2, 25, 70, 19, 28, 272, 320, 288, 27, 10, 322, 73, 484, 191, 226, 1062, 5, 77, 26, 22, 85, 92, 78, 308, 503];
+  function sections() {
+    var byId = {}; COLORS.forEach(function (c) { byId[c[0]] = c; });
+    var used = {}; stock.forEach(function (x) { if (x.color != 9999) used[x.color] = 1; });
+    var com = COMMON.map(function (id) { return byId[id]; }).filter(Boolean), taken = {}; com.forEach(function (c) { taken[c[0]] = 1; });
+    var mine = COLORS.filter(function (c) { return c[0] !== 9999 && used[c[0]] && !taken[c[0]]; }); mine.forEach(function (c) { taken[c[0]] = 1; });
+    var S = [{ label: "★ Courantes", cs: com, fold: 0 }];
+    if (mine.length) S.push({ label: "Mes autres couleurs", cs: mine, fold: 0 });
+    ORDER.forEach(function (n, i) { var cs = COLORS.filter(function (c) { return c[0] !== 9999 && !taken[c[0]] && window.__colFam[c[0]] === i; }); if (cs.length) S.push({ label: n, cs: cs, fold: 1 }); });
+    return S;
+  }
   function organize() {
     var any = COLORS.filter(function (c) { return c[0] === 9999; }), rest = COLORS.filter(function (c) { return c[0] !== 9999; });
     var k = rest.map(function (c) { var x = fam(c); x.c = c; return x; });
@@ -3778,10 +3789,9 @@ applySetMode();
     COLORS.length = 0; any.concat(k.map(function (x) { return x.c; })).forEach(function (c) { COLORS.push(c); });
     window.__colFam = {}; k.forEach(function (x) { window.__colFam[x.c[0]] = x.f; });
     var sel = $("f-color"), cur = sel.value; while (sel.children.length > 1) sel.removeChild(sel.lastChild);
-    ORDER.forEach(function (n, i) {
-      var cs = COLORS.filter(function (c) { return window.__colFam[c[0]] === i; }); if (!cs.length) return;
-      var og = document.createElement("optgroup"); og.label = n;
-      cs.forEach(function (c) { var o = document.createElement("option"); o.value = c[0]; o.textContent = c[1]; og.appendChild(o); }); sel.appendChild(og);
+    sections().forEach(function (sc) {
+      var og = document.createElement("optgroup"); og.label = sc.label;
+      sc.cs.forEach(function (c) { var o = document.createElement("option"); o.value = c[0]; o.textContent = c[1]; og.appendChild(o); }); sel.appendChild(og);
     });
     sel.value = cur;
   }
@@ -3798,25 +3808,92 @@ applySetMode();
     var n = 0; list.forEach(function (c) { if (addCol(c[0], c[1], c[2], c[3])) n++; }); if (n) { organize(); later(); }
   }).catch(function () {});
 
-  /* sélecteur : titres de familles + recherche */
-  var g = $("color-grid-picker");
+  /* sélecteur : courantes en haut, familles repliées, recherche */
+  var g = $("color-grid-picker"), open = {};
   if (g && !$("col-q")) g.insertAdjacentHTML("beforebegin", '<input id="col-q" type="search" placeholder="Chercher une couleur (nom ou numéro)…" style="width:100%;margin:0 0 8px">');
-  function filt() {
+  function fold() {
     var q = $("col-q").value.toLowerCase().trim();
-    g.querySelectorAll(".color-chip").forEach(function (ch) { ch.style.display = !q || (ch.textContent + " " + ch.dataset.c).toLowerCase().indexOf(q) >= 0 ? "" : "none"; });
-    g.querySelectorAll(".col-h").forEach(function (h) { h.style.display = q ? "none" : ""; });
+    g.querySelectorAll(".color-chip").forEach(function (ch) {
+      var hit = !q || (ch.textContent + " " + ch.dataset.c).toLowerCase().indexOf(q) >= 0;
+      ch.style.display = hit && (q || ch.dataset.fold !== "1" || open[ch.dataset.sec]) ? "" : "none";
+    });
+    g.querySelectorAll(".col-h").forEach(function (h) { h.style.display = q ? "none" : ""; if (h.dataset.sec) h.firstChild.nodeValue = (open[h.dataset.sec] ? "▾ " : "▸ "); });
   }
-  $("col-q").addEventListener("input", filt);
+  $("col-q").addEventListener("input", fold);
+  g.addEventListener("click", function (e) { var h = e.target.closest(".col-h[data-sec]"); if (!h) return; open[h.dataset.sec] = !open[h.dataset.sec]; fold(); });
   buildColorPickerGrid = function () {
     $("col-q").value = "";
-    var chip = function (c) { return '<div class="color-chip ' + (c[0] == curCol ? "on" : "") + '" data-c="' + c[0] + '"><span class="dot" style="background:#' + c[2] + '"></span><span>' + esc(c[1]) + '</span></div>'; };
-    var h = COLORS.filter(function (c) { return c[0] === 9999; }).map(chip).join("");
-    ORDER.forEach(function (n, i) {
-      var cs = COLORS.filter(function (c) { return c[0] !== 9999 && window.__colFam[c[0]] === i; }); if (!cs.length) return;
-      h += '<div class="col-h" style="grid-column:1/-1;font-size:12px;font-weight:700;opacity:.7;margin:8px 2px 0">' + n + '</div>' + cs.map(chip).join("");
+    var chip = function (c, i, f) { return '<div class="color-chip ' + (c[0] == curCol ? "on" : "") + '" data-c="' + c[0] + '" data-sec="' + i + '" data-fold="' + f + '"><span class="dot" style="background:#' + c[2] + '"></span><span>' + esc(c[1]) + '</span></div>'; };
+    var h = COLORS.filter(function (c) { return c[0] === 9999; }).map(function (c) { return chip(c, "x", 0); }).join("");
+    sections().forEach(function (sc, i) {
+      h += '<div class="col-h"' + (sc.fold ? ' data-sec="' + i + '"' : "") + ' style="grid-column:1/-1;font-size:12px;font-weight:700;opacity:.75;margin:8px 2px 0;' + (sc.fold ? "cursor:pointer" : "") + '">' + (sc.fold ? "▸ " : "") + "<span>" + sc.label + (sc.fold ? " (" + sc.cs.length + ")" : "") + "</span></div>" + sc.cs.map(function (c) { return chip(c, i, sc.fold); }).join("");
     });
-    g.innerHTML = h;
+    g.innerHTML = h; fold();
   };
+})();
+</script>
+
+<script>
+/* BrickStock : appui long (1 s) sur une pièce du stock → changer la couleur / supprimer, avec bouton Annuler */
+(function () {
+  document.head.insertAdjacentHTML("beforeend", '<style>#list .card,#list .scard{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#list img{pointer-events:none;-webkit-touch-callout:none}@keyframes lphold{from{box-shadow:inset 0 0 0 0 transparent}to{box-shadow:inset 0 0 0 3px rgba(255,255,255,.6)}}.lp-hold{animation:lphold .75s linear .25s forwards}#undo-bar{position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:999999;display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#2a2f3a;color:#fff;border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 30px rgba(0,0,0,.5)}#undo-bar button{background:none;border:0;color:#fbbf24;font-weight:800;font-size:15px}</style>');
+  document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-stkm"><div class="modal-card" id="modal-stkm-card"></div></div><div id="undo-bar"><span id="undo-msg"></span><button id="undo-btn">Annuler</button></div>');
+  var LP = 1000, t = null, sx = 0, sy = 0, el = null, last = 0, cur = null, armed = false, pick = null, snap = null, ut = null;
+  var list = $("list");
+  function clear() { if (t) { clearTimeout(t); t = null; } if (el) { el.classList.remove("lp-hold"); el = null; } }
+  list.addEventListener("pointerdown", function (e) {
+    if (e.button > 0) return; var r = e.target.closest("[data-pk]"); if (!r) return;
+    clear(); sx = e.clientX; sy = e.clientY; el = r; r.classList.add("lp-hold"); var k = r.dataset.pk;
+    t = setTimeout(function () { t = null; if (el) el.classList.remove("lp-hold"); el = null; last = Date.now(); try { triggerHaptic(); } catch (_) {} openMenu(k); }, LP);
+  });
+  list.addEventListener("pointermove", function (e) { if (t && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) clear(); });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) { list.addEventListener(ev, clear); });
+  window.addEventListener("scroll", clear, true);
+  list.addEventListener("contextmenu", function (e) { if (e.target.closest("[data-pk]")) e.preventDefault(); });
+  list.addEventListener("click", function (e) { if (Date.now() - last < 800) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+
+  function undoBar(msg) {
+    $("undo-msg").textContent = msg; $("undo-bar").style.display = "flex"; clearTimeout(ut);
+    ut = setTimeout(function () { $("undo-bar").style.display = "none"; }, 7000);
+  }
+  $("undo-btn").onclick = function () {
+    if (!snap) return; stock = JSON.parse(snap); snap = null; save(); render(); try { renderCollection(); } catch (e) {}
+    $("undo-bar").style.display = "none"; showToast("Annulé");
+  };
+  function openMenu(k) {
+    var it = stock.find(function (x) { return x.k === k; }); if (!it) return; cur = k; armed = false;
+    var rs = typeof committedQty === "function" ? Math.min(it.qty, committedQty(k)) : 0;
+    $("modal-stkm-card").innerHTML = '<div class="modal-header"><h3>' + esc(it.part) + '</h3><button class="icon-btn" data-sm="close">✕</button></div>' +
+      '<div class="sub">' + esc(it.name || "") + '<br>' + esc(colName(it.color)) + ' · ×' + it.qty + '</div>' +
+      (rs ? '<div class="sub" style="margin-top:6px;color:#f59e0b">🔒 ' + rs + ' réservée' + (rs > 1 ? "s" : "") + ' pour des sets</div>' : "") +
+      '<button class="btn full" data-sm="col" style="margin-top:14px">🎨 Changer la couleur</button>' +
+      '<button class="btn full" data-sm="del" style="margin-top:8px;border-color:#ef4444;color:#ef4444">🗑 Supprimer</button>';
+    lift("modal-stkm");
+  }
+  var M = $("modal-stkm");
+  M.addEventListener("pointerdown", function () { armed = true; });   /* ignore le « clic » issu du relâchement de l'appui long */
+  M.addEventListener("click", function (e) {
+    if (!armed) return; var b = e.target.closest("[data-sm]");
+    if (e.target === M || (b && b.dataset.sm === "close")) { M.classList.remove("open"); return; }
+    if (!b) return; M.classList.remove("open");
+    if (b.dataset.sm === "col") { pick = cur; buildColorPickerGrid(); lift("modal-color"); }
+    else if (b.dataset.sm === "del") {
+      var it = stock.find(function (x) { return x.k === cur; }); if (!it) return;
+      snap = JSON.stringify(stock); stock = stock.filter(function (x) { return x !== it; }); save(); render(); try { renderCollection(); } catch (e2) {}
+      undoBar("Supprimé : " + it.part + " (" + colName(it.color) + ", ×" + it.qty + ")");
+    }
+  });
+  $("modal-color").addEventListener("click", function (e) {
+    if (pick == null) return; var chip = e.target.closest(".color-chip");
+    if (!chip) { if (e.target.closest(".icon-btn") || e.target === $("modal-color")) pick = null; return; }
+    e.stopPropagation(); var c = +chip.dataset.c; if (c === 9999) { showToast("Choisis une couleur précise"); return; }
+    var k = pick; pick = null; $("modal-color").classList.remove("open");
+    var it = stock.find(function (x) { return x.k === k; }); if (!it || it.color === c) return;
+    snap = JSON.stringify(stock); var old = colName(it.color), nk = it.part + "|" + c, tg = stock.find(function (x) { return x.k === nk; });
+    if (tg) { tg.qty += it.qty; stock = stock.filter(function (x) { return x !== it; }); } else { it.k = nk; it.color = c; }
+    save(); render(); try { renderCollection(); } catch (e2) {}
+    undoBar(it.part + " : " + old + " → " + colName(c) + (tg ? " (regroupée avec le stock existant)" : ""));
+  }, true);
 })();
 </script>
 
