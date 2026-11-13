@@ -3906,8 +3906,8 @@ applySetMode();
 <script>
 /* BrickStock : appui long (1 s) sur une pièce du stock → changer la couleur / supprimer, avec bouton Annuler */
 (function () {
-  document.head.insertAdjacentHTML("beforeend", '<style>#list .card,#list .scard{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#list img{pointer-events:none;-webkit-touch-callout:none}@keyframes lphold{from{box-shadow:inset 0 0 0 0 transparent}to{box-shadow:inset 0 0 0 3px rgba(255,255,255,.6)}}.lp-hold{animation:lphold .5s linear .2s forwards}#undo-bar{position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:999999;display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#2a2f3a;color:#fff;border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 30px rgba(0,0,0,.5)}#undo-bar button{background:none;border:0;color:#fbbf24;font-weight:800;font-size:15px}</style>');
-  document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-stkm"><div class="modal-card" id="modal-stkm-card"></div></div><div id="undo-bar"><span id="undo-msg"></span><button id="undo-btn">Annuler</button></div>');
+  document.head.insertAdjacentHTML("beforeend", '<style>#list .card,#list .scard{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}#list img{pointer-events:none;-webkit-touch-callout:none}@keyframes lphold{from{box-shadow:inset 0 0 0 0 transparent}to{box-shadow:inset 0 0 0 3px rgba(255,255,255,.6)}}.lp-hold{animation:lphold .5s linear .2s forwards}#lp-undo{position:fixed;left:12px;right:12px;transform:none;bottom:calc(var(--nav-h,62px) + 12px + env(safe-area-inset-bottom));z-index:999999;display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#2a2f3a;color:#fff;border:1px solid rgba(255,255,255,.15);box-shadow:0 8px 30px rgba(0,0,0,.5)}#lp-undo button{background:none;border:0;color:#fbbf24;font-weight:800;font-size:15px}</style>');
+  document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-stkm"><div class="modal-card" id="modal-stkm-card"></div></div><div id="lp-undo"><span id="lp-undo-msg"></span><button id="lp-undo-btn">Annuler</button></div>');
   var LP = 700, t = null, sx = 0, sy = 0, el = null, last = 0, cur = null, armed = false, pick = null, snap = null, ut = null;
   var list = $("list");
   function clear() { if (t) { clearTimeout(t); t = null; } if (el) { el.classList.remove("lp-hold"); el = null; } }
@@ -3923,12 +3923,12 @@ applySetMode();
   list.addEventListener("click", function (e) { if (Date.now() - last < 800) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
 
   function undoBar(msg) {
-    $("undo-msg").textContent = msg; $("undo-bar").style.display = "flex"; clearTimeout(ut);
-    ut = setTimeout(function () { $("undo-bar").style.display = "none"; }, 7000);
+    $("lp-undo-msg").textContent = msg; $("lp-undo").style.display = "flex"; clearTimeout(ut);
+    ut = setTimeout(function () { $("lp-undo").style.display = "none"; }, 7000);
   }
-  $("undo-btn").onclick = function () {
+  $("lp-undo-btn").onclick = function () {
     if (!snap) return; stock = JSON.parse(snap); snap = null; save(); render(); try { renderCollection(); } catch (e) {}
-    $("undo-bar").style.display = "none"; showToast("Annulé");
+    $("lp-undo").style.display = "none"; showToast("Annulé");
   };
   function openMenu(k) {
     var it = stock.find(function (x) { return x.k === k; }); if (!it) return; cur = k; armed = false;
