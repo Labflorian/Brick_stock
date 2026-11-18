@@ -1,0 +1,26 @@
+# BrickStock — règles du projet
+
+BrickStock est une appli LEGO (stock de pièces, sets, minifigs) qui tient dans **un seul fichier `index.html`**.
+
+## Règles (permanentes)
+
+- **HTML/CSS/JS vanilla uniquement** : pas de framework, pas de `sw.js`, pas de PWA, pas de fichier supplémentaire obligatoire. Tout reste dans `index.html`.
+- **Ne jamais casser** :
+  - la synchro Gist (`createGist`, `pull`, `push`, `joinGist`) ;
+  - le moteur de couleurs CIELAB (`rgbToLab`, `deltaE`, `colDist`, `analyseColor`) ;
+  - les intégrations Rebrickable (`rb(...)`, clé `rbKey`) et Brickognize (`api.brickognize.com/predict/...`).
+- **Pas de gestion d'emplacements physiques ni de bacs.**
+- **Comportements automatiques** : le scan doit donner directement la bonne pièce. Pas d'étape manuelle supplémentaire par pièce.
+- **Répondre en français.** Pour un gros changement, expliquer d'abord en quelques lignes ce qui va être fait.
+- **Après chaque modification** : tester dans un navigateur (Playwright si possible) et vérifier qu'il n'y a **aucune erreur dans la console**.
+
+## Git
+
+- On travaille sur la branche `dev` ; `main` contient la « Version de départ ».
+
+## Repères dans index.html
+
+- `<head>` : petit script de thème, puis un gros `<style>`.
+- Corps : `<header>`, modale Paramètres (Gist + API), modale sélecteur de couleur, onglets `#s-stock`, `#s-sets`, `#s-figs`, `#s-scan`, puis `<nav>`.
+- Script principal (le plus long) : couleurs, stock, sets, synchro Gist, moteur CIELAB, caméra et scan.
+- Ensuite, une série de blocs `<script>` ajoutés au fil des versions (v2, v3, v4, puis des correctifs ciblés). Plusieurs **remplacent ou enveloppent** des fonctions définies plus haut (ex. `renderPart`, `fetchEquivs`, `rowRes`). Avant de modifier une fonction, chercher si un bloc plus bas la redéfinit.
