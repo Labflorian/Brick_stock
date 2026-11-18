@@ -1817,7 +1817,7 @@ document.addEventListener("click", e => {
 });
 function renderStockRows(rows) {
   const el = $("list"); el.className = stkView === "grid" ? "sgrid" : "";
-  const cm = typeof committedQty === "function", rs = x => cm ? Math.min(x.qty, committedQty(x.k)) : 0;
+  const cm = typeof committedQty === "function", rs = x => cm ? (window.rowRes ? Math.min(x.qty, rowRes()[x.k] || 0) : Math.min(x.qty, committedQty(x.k))) : 0;
   el.innerHTML = rows.map(x => {
     const r = rs(x), f = x.qty - r;
     if (stkView === "grid") return `<div class="scard ${r && !f ? "nofree" : ""}" data-pk="${esc(x.k)}">${imgTag(x)}<span class="sq">×${x.qty}</span>${r ? '<span class="sl">🔒</span>' : ""}<div class="fn">${esc(x.part)}</div><div class="fm"><span class="sw" style="background:${colRgb(x.color)}"></span>${esc(shortCol(x.color))}</div></div>`;
@@ -1837,7 +1837,7 @@ function render() {
   const nz = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const toks = nz(f).split(/\s+/).filter(Boolean), fr = $("f-res") ? $("f-res").value : "";
   const hasRes = typeof committedQty === "function";
-  const resOf = x => hasRes ? Math.min(x.qty, committedQty(x.k)) : 0;
+  const resOf = x => hasRes ? (window.rowRes ? Math.min(x.qty, rowRes()[x.k] || 0) : Math.min(x.qty, committedQty(x.k))) : 0;
   let rows = stock.filter(x => {
     const hay = nz(x.part + " " + x.name + " " + colName(x.color));
     const matchesQuery = !toks.length || toks.every(t => hay.includes(t));
@@ -2415,7 +2415,7 @@ function addAllToStock(s) { // j'ai toutes les pièces de ce set : elles entrent
   showToast("Pièces ajoutées et réservées pour ce set 🔒");
 }
 function consume(s) { // les pièces du set sortent du stock (set monté avec ces pièces)
-  const cmq = commitMap(); needsOf(s).forEach(n => { const al = cmq[n.k] && cmq[n.k].by[s.num] != null ? cmq[n.k].by[s.num] : n.qty; let left = Math.min(n.qty, al); stock.filter(x => canonK(x.k) === n.k).sort((a, b) => (b.k === n.p.k) - (a.k === n.p.k)).forEach(it => { const t = Math.min(it.qty, left); it.qty -= t; left -= t; }); });
+  const cmq = commitMap(); needsOf(s).forEach(n => { const al = cmq[n.k] && cmq[n.k].by[s.num] != null ? cmq[n.k].by[s.num] : n.qty; let left = Math.min(n.qty, al); ((s.use && s.use[n.k]) || []).forEach(u => { const it0 = stock.find(x => x.k === u.k); if (it0) { const t0 = Math.min(it0.qty, u.n, left); it0.qty -= t0; left -= t0; } }); stock.filter(x => canonK(x.k) === n.k).sort((a, b) => (b.k === n.p.k) - (a.k === n.p.k)).forEach(it => { const t = Math.min(it.qty, left); it.qty -= t; left -= t; }); });
   stock = stock.filter(x => x.qty > 0); save(); render();
 }
 function markBuilt(s) {
@@ -2630,7 +2630,7 @@ function renderPart() {
   const inSets = setsCol.map(s => ({ s, q: q4(s) })).filter(x => x.q > 0);
   const inFigs = figs.map(f => ({ f, q: ((f.parts || []).find(p => p.part === o.part && p.color == o.color) || { qty: 0 }).qty })).filter(x => x.q > 0);
   const unk = figs.filter(f => !f.parts).length;
-  const res = users.reduce((n, x) => n + x.a, 0), free = Math.max(0, qty - res);
+  const res = window.rowRes ? Math.min(qty, rowRes()[o.k] || 0) : users.reduce((n, x) => n + x.a, 0), free = Math.max(0, qty - res);
   const vars = stock.filter(x => x.part === o.part).sort((a, b) => b.qty - a.qty);
   const eqv = stock.filter(x => x.part !== o.part && canonK(x.k) === ck).sort((a, b) => b.qty - a.qty);
   let ctx = "";
@@ -3236,7 +3236,7 @@ function bkMerge(b) { // même pièce + même couleur : on additionne
 }
 function basketAdd(cands, col, thumb, sug) {
   if (!cands.length) { st("Aucune pièce reconnue. Essaie sous un autre angle."); showToast("Aucune pièce reconnue"); return; }
-  const top = cands[0], ex = basket.find(b => b.part === top.part && b.color === col);
+  const top = cands[0], ex = basket.find(b => b.color === col && (b.part === top.part || b.alias === top.part || canonPart(b.part) === canonPart(top.part)));
   if (ex) { ex.qty++; bkHi = ex.id; if (!ex.thumb) ex.thumb = thumb; basket = [ex, ...basket.filter(b => b !== ex)]; }
   else { const b = { id: ++bkId, part: top.part, name: top.name, img: top.img, color: col, qty: 1, score: top.score, alts: cands.slice(1), thumb, sug: sug || [] }; basket.unshift(b); bkHi = b.id; }
   bkSave(); renderBasket(); triggerHaptic();
@@ -3605,6 +3605,37 @@ applySetMode();
 })();
 </script>
 <script>
+/* BrickStock : réservation « exacte d'abord » — la pièce avec autocollant (réf. imprimée) est utilisée pour son set avant les pièces lisses */
+window.rowRes = function () {
+  var t = _tick(); if (t.rr) return t.rr;
+  var cm = commitMap(), out = {}, pools = {}, dem = {};
+  stock.forEach(function (x) { var ck = canonK(x.k); (pools[ck] = pools[ck] || []).push(x); });
+  setsCol.forEach(function (s) {
+    if (!isCommitted(s)) return;
+    s.parts.forEach(function (p) { if (!p.st) dem[p.k] = (dem[p.k] || 0) + p.qty; });
+    Object.keys(s.use || {}).forEach(function (ck) {   /* pièces que tu as choisies à la main pour ce set */
+      (s.use[ck] || []).forEach(function (u) {
+        var amt = u.n, ref = s.parts.find(function (p) { return !p.st && canonK(p.k) === ck && (dem[p.k] || 0) > 0; });
+        if (ref) { var t = Math.min(amt, dem[ref.k]); dem[ref.k] -= t; amt = t; }
+        dem[u.k] = (dem[u.k] || 0) + amt;
+      });
+    });
+  });
+  Object.keys(pools).forEach(function (ck) {
+    var A = (cm[ck] && cm[ck].total) || 0; if (!A) return; var rows = pools[ck];
+    rows.forEach(function (x) { var e = Math.min(x.qty, dem[x.k] || 0, A); out[x.k] = e; A -= e; });
+    rows.forEach(function (x) { if (A <= 0) return; var e = Math.min(x.qty - (out[x.k] || 0), A); out[x.k] = (out[x.k] || 0) + e; A -= e; });
+  });
+  return t.rr = out;
+};
+/* fusionne les lignes du panier rafale qui sont la même pièce (même réf. ou réf. équivalente, même couleur) */
+window.bkDedupe = function () {
+  var seen = {};
+  basket = basket.filter(function (x) { var k = canonPart(x.part) + "|" + x.color; if (seen[k]) { seen[k].qty += x.qty; return false; } seen[k] = x; return true; });
+};
+</script>
+
+<script>
 /* BrickStock : (1) au scan, propose les pièces de tes sets qui ressemblent ; (2) « 🔎 Chercher dans mon stock » depuis une pièce d'un set */
 (function () {
   var STOP = { with: 1, and: 1, the: 1, of: 1, for: 1, to: 1, in: 1, on: 1, no: 1, x: 1 };
@@ -3656,7 +3687,7 @@ applySetMode();
   var _ba = basketAdd;
   basketAdd = function (c, col, th, sug) {
     var top = c && c[0]; _ba(c, col, th, sug);
-    try { var b = top && basket.find(function (x) { return x.part === top.part && x.color === col; }); if (b && c.length) { var L = setSug(c, col), m = L.length ? L[0] : null; if (m && m.exact) { b.alts = [{ part: b.part, name: b.name, img: b.img, score: b.score }].concat(b.alts || []); b.part = m.part; b.name = m.name; b.img = m.img; b.setSug = null; bkSave(); } else b.setSug = m; renderBasket(); } } catch (e) {}
+    try { var b = top && basket.find(function (x) { return x.color === col && (x.part === top.part || x.alias === top.part || canonPart(x.part) === canonPart(top.part)); }); if (b && c.length) { var L = setSug(c, col), m = L.length ? L[0] : null; if (m && m.exact) { b.alts = [{ part: b.part, name: b.name, img: b.img, score: b.score }].concat(b.alts || []); b.alias = b.part; b.part = m.part; b.name = m.name; b.img = m.img; b.setSug = null; bkDedupe(); bkSave(); } else b.setSug = m; renderBasket(); } } catch (e) {}
   };
   var _rb = renderBasket;
   renderBasket = function () {
@@ -3746,8 +3777,8 @@ applySetMode();
   basketAdd = function (c, col, th, sug) {
     var top = c && c[0]; _ba(c, col, th, sug);
     try {
-      var b = top && basket.find(function (x) { return x.part === top.part && x.color === col; }); if (!b) return;
-      var all = [b].concat(b.alts || []); run(all, function () { b.setSug = null; bkSave(); renderBasket(); });
+      var b = top && basket.find(function (x) { return x.color === col && (x.part === top.part || x.alias === top.part || canonPart(x.part) === canonPart(top.part)); }); if (!b) return;
+      var all = [b].concat(b.alts || []); run(all, function () { b.setSug = null; bkDedupe(); bkSave(); renderBasket(); });
     } catch (e) {}
   };
 })();
@@ -3964,6 +3995,44 @@ applySetMode();
     save(); render(); try { renderCollection(); } catch (e2) {}
     undoBar(it.part + " : " + old + " → " + colName(c) + (tg ? " (regroupée avec le stock existant)" : ""));
   }, true);
+})();
+</script>
+
+<script>
+/* BrickStock : « 🏷 Utiliser ma pièce avec autocollant » — choisir dans ton stock la variante utilisée pour CE set */
+(function () {
+  document.body.insertAdjacentHTML("beforeend", '<div class="modal-overlay" id="modal-use"><div class="modal-card" id="modal-use-card"></div></div>');
+  var ctx = null;
+  function variants(o) { var ck = canonK(o.k); return stock.filter(function (x) { return x.k !== o.k && canonK(x.k) === ck; }).sort(function (a, b) { return b.qty - a.qty; }); }
+  function refresh() { render(); renderCollection(); try { if ($("modal-set").classList.contains("open")) renderDetail(); } catch (e) {} renderPart(); }
+  function openUse() {
+    var s = getSet(ctx.setNum), ck = canonK(ctx.k), cur = (s && s.use && s.use[ck]) || [], vs = variants({ k: ctx.k });
+    $("modal-use-card").innerHTML = '<div class="modal-header"><h3>🏷 Ma pièce pour ce set</h3><button class="icon-btn" data-uc="close">✕</button></div>' +
+      '<div class="sub">Pour « ' + esc(s ? s.name : "") + ' » (' + esc(ctx.part) + ', ×' + ctx.need + ') : choisis la pièce de ton stock à utiliser en priorité. Tes autres pièces restent libres.</div>' +
+      (cur.length ? '<div class="sub" style="margin-top:8px">Choisie : ' + cur.map(function (u) { return esc(u.k.split("|")[0]) + ' ×' + u.n + ' <a href="#" data-ucx="' + esc(u.k) + '">✕ retirer</a>'; }).join(" · ") + '</div>' : "") +
+      '<div id="use-list" style="margin-top:10px">' + (vs.length ? vs.map(function (x) { return '<div class="card" data-ucp="' + esc(x.k) + '" style="cursor:pointer">' + imgTag(x) + '<div class="grow"><div class="pn">' + esc(x.part) + '</div><div class="name">' + esc(x.name) + '</div><div class="cl1"><span class="sw" style="background:' + colRgb(x.color) + '"></span>' + esc(shortCol(x.color)) + '</div></div><div class="qlab">×' + x.qty + '</div></div>'; }).join("") : '<div class="empty">Aucune variante dans ton stock. Ajoute d\'abord ta pièce avec autocollant au stock (scan ou « Rechercher »).</div>') + '</div>';
+    lift("modal-use");
+  }
+  var _rp = renderPart;
+  renderPart = function () {
+    _rp();
+    try {
+      if (partCtx && partCtx.need && partObj) {
+        var s = getSet(partCtx.setNum), c = $("modal-part-card").querySelector(".set-card"), vs = variants(partObj), cur = (s && s.use && s.use[canonK(partObj.k)]) || [];
+        if (c && (vs.length || cur.length)) c.insertAdjacentHTML("beforeend", (cur.length ? '<div class="meta" style="margin-top:6px">🏷 Utilisée pour ce set : ' + cur.map(function (u) { return esc(u.k.split("|")[0]) + " ×" + u.n; }).join(", ") + '</div>' : "") + '<button class="btn sm full" data-uses="1" style="margin-top:6px">🏷 Utiliser ma pièce avec autocollant (ou variante)</button>');
+      }
+    } catch (e) {}
+  };
+  $("modal-part").addEventListener("click", function (e) { if (e.target.closest("[data-uses]") && partObj && partCtx) { ctx = { k: partObj.k, part: partObj.part, setNum: partCtx.setNum, need: partCtx.need }; openUse(); } });
+  $("modal-use").addEventListener("click", function (e) {
+    if (e.target === $("modal-use") || e.target.closest("[data-uc='close']")) { $("modal-use").classList.remove("open"); return; }
+    var s = getSet(ctx.setNum); if (!s) return; var ck = canonK(ctx.k); s.use = s.use || {};
+    var un = e.target.closest("[data-ucx]");
+    if (un) { e.preventDefault(); s.use[ck] = (s.use[ck] || []).filter(function (u) { return u.k !== un.dataset.ucx; }); if (!s.use[ck].length) delete s.use[ck]; saveSets(); openUse(); refresh(); return; }
+    var r = e.target.closest("[data-ucp]"); if (!r) return; var it = stock.find(function (x) { return x.k === r.dataset.ucp; }); if (!it) return;
+    s.use[ck] = (s.use[ck] || []).filter(function (u) { return u.k !== it.k; }).concat([{ k: it.k, n: Math.max(1, Math.min(it.qty, ctx.need)) }]);
+    saveSets(); $("modal-use").classList.remove("open"); refresh(); showToast(it.part + " sera utilisée pour ce set");
+  });
 })();
 </script>
 
