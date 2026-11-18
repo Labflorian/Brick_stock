@@ -16,7 +16,10 @@ BrickStock est une appli LEGO (stock de pièces, sets, minifigs) qui tient dans 
 
 ## Git
 
-- On travaille sur la branche `dev` ; `main` contient la « Version de départ ».
+- Dépôt GitHub : https://github.com/Labflorian/Brick_stock (remote `origin`).
+- Site publié par GitHub Pages depuis `main` : https://labflorian.github.io/Brick_stock/
+- On travaille sur `dev`. On ne fusionne dans `main` et on ne pousse `main` que sur accord explicite de l'utilisateur, puis on vérifie que le site en ligne sert la nouvelle version (sans erreur console).
+- Le disque du Mac ne distingue pas les majuscules : ne jamais recréer `Index.html` à côté de `index.html`.
 
 ## Repères dans index.html
 
