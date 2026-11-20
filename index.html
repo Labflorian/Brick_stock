@@ -3755,7 +3755,7 @@ window.bkDedupe = function () {
     missingFor(col).forEach(function (m) {
       if (have[m.part] || seen[m.part]) return;
       var cc = canonPart(m.part);
-      if (cands.some(function (c) { return c.part !== m.part && canonPart(c.part) === cc; })) { seen[m.part] = 1; res.push({ m: { part: m.part, name: m.name, img: m.img, set: m.set, exact: 1 }, s: 2 }); return; }
+      if (cands.some(function (c) { return c.part !== m.part && canonPart(c.part) === cc && !printBase(c.part) === !printBase(m.part); })) { seen[m.part] = 1; res.push({ m: { part: m.part, name: m.name, img: m.img, set: m.set, exact: 1 }, s: 2 }); return; }
       /* plus de rapprochement par les mots du nom (proposait des pièces de forme différente) : seules les équivalences prouvées comptent */
     });
     return res.sort(function (x, y) { return y.s - x.s; }).slice(0, 2).map(function (x) { return x.m; });
@@ -4270,12 +4270,20 @@ window.bkDedupe = function () {
     setsCol.forEach(function (s) {
       if (s.manual === "built" && !s.added) return;
       (s.parts || []).forEach(function (p) {
-        if (p.st) return; var c = canonPart(p.part), o = m[c] = m[c] || { part: p.part, n: p.n, i: p.i, cols: {}, miss: {} };
+        if (p.st) return; var c = canonPart(p.part), o = m[c] = m[c] || { cols: {}, miss: {}, items: [] };
         o.cols[p.color] = 1;
-        if (!s.wish && p.qty > availFor(p.k, s.num)) { o.miss[p.color] = 1; if (!o.missSeen) { o.part = p.part; o.n = p.n; o.i = p.i; o.missSeen = 1; } }
+        var miss = !s.wish && p.qty > availFor(p.k, s.num); if (miss) o.miss[p.color] = 1;
+        o.items.push({ part: p.part, n: p.n, i: p.i, color: p.color, miss: miss });
       });
     });
     return m;
+  }
+  /* numéro utilisé par un de tes sets pour CETTE pièce : même couleur, et jamais une version imprimée à la place d'une lisse (ni l'inverse) */
+  function setRefFor(R, part, col) {
+    var o = R[canonPart(part)]; if (!o) return null;
+    var pr = !!printBase(part), L = o.items.filter(function (x) { return !!printBase(x.part) === pr && (col === 9999 || col == null || x.color == col); });
+    if (!L.length) return null;
+    return L.find(function (x) { return x.part === part; }) || L.find(function (x) { return x.miss; }) || L[0];
   }
   var labOf = function (id) { var e = PALETTE_LAB.find(function (p) { return p.id == id; }); if (e && e.lab) return e.lab; var h = colRgb(id).slice(1); var r = hex2rgb(h); return rgbToLab(r[0], r[1], r[2]); };
   var _ac = analyseColor;
@@ -4290,7 +4298,7 @@ window.bkDedupe = function () {
     /* 1. numéro prouvé identique à une pièce de mes sets : on prend le numéro du set */
     var R = setRefs();
     out.cands.forEach(function (c) {
-      var r = R[canonPart(c.part)]; c.inSet = !!r;
+      var r = setRefFor(R, c.part, col); c.inSet = !!r;
       if (r && r.part !== c.part) { c.alias = c.part; c.part = r.part; if (r.n) c.name = r.n; if (r.i) c.img = r.i; }
       c.old = !c.inSet && partOld(c.alias || c.part);
     });
