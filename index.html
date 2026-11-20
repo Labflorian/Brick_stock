@@ -4174,7 +4174,7 @@ window.bkDedupe = function () {
 
   /* ===== Ergonomie (lot 2) : moins de boutons visibles, aucune fonction supprimée ===== */
   document.head.insertAdjacentHTML("beforeend", "<style>"
-    + "#torch-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}#torch-ind{position:absolute;top:8px;left:8px;z-index:3;background:var(--primary);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:12px;pointer-events:none}"
+    + "#torch-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}"
     + "#s-scan .scan-bottom{margin-top:auto}"
     + ".stk-menu{position:relative;flex:none}.stk-pop{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:230px;padding:8px;border-radius:12px;background:var(--card-bg);border:1px solid var(--card-border);box-shadow:0 10px 30px rgba(0,0,0,.35);flex-direction:column;gap:6px}.stk-pop.open{display:flex}.stk-pop .btn{width:100%}"
     + "body.stk-c2 #list.sgrid{grid-template-columns:repeat(2,1fr)}body.stk-c3 #list.sgrid{grid-template-columns:repeat(3,1fr)}"
@@ -4185,11 +4185,7 @@ window.bkDedupe = function () {
     /* « Auto (2,5 s) » rangé dans ⚙️ Paramètres (le reste de l'onglet Scanner est comme avant) */
     var autoLbl = $("auto").closest("label"), y = $("ymin-in");
     if (autoLbl && y) { var h = document.createElement("div"); h.className = "sub"; h.style.marginTop = "10px"; h.textContent = "Scanner : scan automatique"; y.insertAdjacentElement("afterend", h); h.insertAdjacentElement("afterend", autoLbl); autoLbl.style.margin = "4px 0 0"; }
-    /* Flash : bien visible quand il est allumé (bouton rouge + pastille sur l'image) */
-    var torch = $("torch-btn"), vw = $("vw-box");
-    vw.insertAdjacentHTML("beforeend", '<div id="torch-ind">🔦 Flash allumé</div>');
-    var syncTorch = function () { var on = torch.classList.contains("on"); torch.textContent = on ? "🔦 Flash allumé" : "🔦 Flash"; $("torch-ind").style.display = on ? "" : "none"; };
-    new MutationObserver(syncTorch).observe(torch, { attributes: true, attributeFilter: ["class"] }); syncTorch();
+    /* Flash allumé : le bouton passe simplement en rouge (voir le style #torch-btn.on) */
     /* badge « Zoom » : seulement pour un zoom aux doigts (sinon il répète 1x / 2x / 3x) */
     var zb = $("zoom-badge"), syncZ = function () { var z = parseFloat((zb.textContent.match(/[\d.]+/) || ["1"])[0]); zb.style.display = [1, 2, 3].some(function (k) { return Math.abs(z - k) < 0.05; }) ? "none" : ""; };
     new MutationObserver(syncZ).observe(zb, { childList: true, characterData: true, subtree: true }); syncZ();
