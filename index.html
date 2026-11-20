@@ -1116,7 +1116,7 @@ body.raf-on .vw-container { height: 180px; height: clamp(160px, 26dvh, 300px); }
 
     <div class="row" id="scan-opts" style="margin: 0; align-items: center; justify-content: space-between;">
       <label class="chk">
-        <input type="checkbox" id="autocol" checked> Couleur auto de la pièce
+        <input type="checkbox" id="autocol" checked> Couleur auto
       </label>
       <label class="chk">
         <input type="checkbox" id="auto"> Auto (2,5s)
@@ -2513,7 +2513,7 @@ function renderCollection() {
   const unb = setsCol.filter(s => ["todo", "missing"].includes(info.get(s).c));
   const ms = buyRows(unb).reduce((n, r) => n + r.miss, 0), nt = unb.reduce((n, s) => n + info.get(s).need, 0);
   const wmiss = setsCol.some(s => info.get(s).c === "wish" && info.get(s).miss > 0);
-  let top = '<div class="row" style="margin-bottom:8px"><button class="btn sm full" data-notices="1">📚 Notices de mes sets</button><button class="btn sm" data-view="1" style="flex:none">' + (setView === "grid" ? "☰ Liste" : "▦ Grille") + '</button></div>';
+  let top = '<div class="row" style="margin-bottom:8px"><button class="btn sm" data-notices="1" style="flex:2">📚 Notices de mes sets</button><button class="btn sm" data-view="1" style="flex:1.2">' + (setView === "grid" ? "☰ Afficher en liste" : "▦ Afficher en grille") + '</button></div>';
   if (colCat === "ready") top += '<div class="sub" style="margin-bottom:8px">⚡ Sets de ta collection et de tes envies que tu peux monter dès maintenant à 100 % avec ton stock libre.</div>';
   if (colCat === "todo" || colCat === "missing") {
     if (unb.length > 1) top += `<div class="set-card"><div class="pn">Tous les sets non construits ensemble</div>
@@ -2538,12 +2538,13 @@ function renderCollection() {
     return `<div class="fcard" data-open="${esc(s.num)}"><img src="${esc(s.img)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt=""><div class="fn">${esc(s.name)}</div>
       <div class="fm" style="color:${col}">${t}</div>${c === "built" ? "" : `<div class="progress-container" style="margin-top:6px"><div class="progress-bar" style="width:${pct}%; background:${col};"></div></div>`}</div>`;
   };
-  const seg = [["built", "Construits"], ["todo", "À construire"], ["missing", "À compléter"], ["wish", "Envies"], ["ready", "⚡ Prêts"]].map(([c, l]) => `<button data-cat="${c}" class="${colCat === c ? 'on' : ''}"><span>${l}</span><b>${cnt[c]}</b></button>`).join("");
+  const seg = [["todo", "À construire"], ["missing", "À compléter"], ["ready", "⚡ Prêts"], ["built", "Construits"], ["wish", "Envies"]].map(([c, l]) => `<option value="${c}" ${colCat === c ? "selected" : ""}>${l} (${cnt[c]})</option>`).join("");
   el.innerHTML = `<div class="scan-results-title" style="margin:16px 0 0"><span>Ma collection · ${plural(setsCol.length, "set")}</span></div>
-    <div class="seg s5">${seg}</div>${top}
+    <select id="coll-cat">${seg}</select>${top}
     ${list.length ? (setView === "grid" ? '<div class="fgrid">' + list.map(mini).join("") + "</div>" : list.map(card).join("")) : '<div class="empty">' + (ctoks.length ? "Aucun set ne correspond à ta recherche." : colCat === "ready" ? "Aucun set n'est complet à 100 % pour l'instant." : colCat === "wish" ? "Ajoute des sets à ta liste d'envies depuis la recherche (bouton ⭐)." : "Aucun set dans cette catégorie.") + '</div>'}`;
 }
 
+$("set-collection").addEventListener("change", e => { if (e.target.id === "coll-cat") { colCat = e.target.value; renderCollection(); } });
 $("set-collection").onclick = e => {
   const sg = e.target.closest("[data-cat]"); if (sg) { colCat = sg.dataset.cat; renderCollection(); return; }
   const vw = e.target.closest("[data-view]"); if (vw) { setView = setView === "grid" ? "list" : "grid"; LSset("bs_setview", setView); renderCollection(); return; }
@@ -3620,7 +3621,7 @@ function renderSug() {
       return `<div class="sg-row" data-sg="${i}">${figImg(x.img)}<div class="grow"><div class="pn">${esc(x.name)}</div><div class="sub">${esc(x.num)} · ${x.year || "?"} · ${x.np} pièces</div>
         <div class="progress-container" style="margin-top:4px"><div class="progress-bar" style="width:${x.pct}%;background:${col}"></div></div>
         <div class="meta" style="color:${col}">${Math.round(x.pct)} % · il te manque ${plural(x.miss, "pièce")}</div></div><button class="btn sm sg-add" data-sgw="${i}">⭐</button></div>`; };
-  el.innerHTML = `<div class="row" style="align-items:center;margin:8px 0 0"><div class="chips" style="flex:1">${[20, 40, 60, 80, 95].map(v => `<button class="chip ${sugMin === v ? "on" : ""}" data-sgmin="${v}">≥ ${v} %</button>`).join("")}</div><button class="btn sm" data-sginfo="1" style="flex:none" title="Comment ça marche ?">ⓘ</button></div>
+  el.innerHTML = `<div class="row" style="align-items:center;margin:8px 0 0"><div class="chips" style="flex:1">${[20, 40, 60, 80].map(v => `<button class="chip ${sugMin === v ? "on" : ""}" data-sgmin="${v}">≥ ${v} %</button>`).join("")}</div><button class="btn sm" data-sginfo="1" style="flex:none" title="Comment ça marche ?">ⓘ</button></div>
     ${sugInfo ? `<div class="sub" style="margin:6px 0">Sets LEGO (à partir de ${ymin}, hors ta collection) que ton stock libre permet de monter, calculés pièce par pièce, couleur par couleur, avec tes équivalences. Les candidats viennent de tes pièces les plus rares. Le premier calcul prend environ une minute ; les suivants sont bien plus rapides.</div>` : ""}
     <button class="btn ${sugBusy ? "" : "pri"} full" data-sgrun="1" style="margin:6px 0">${sugBusy ? "⏹ Arrêter" : (sug.t ? "🔄 Recalculer" : "🔎 Calculer les suggestions")}</button>
     ${sugMsg ? `<div class="sub" style="text-align:center;margin-bottom:6px">${esc(sugMsg)}</div>` : ""}
@@ -4170,6 +4171,58 @@ window.bkDedupe = function () {
   var _rfr = renderFsRes;
   renderFsRes = function () { _rfr(); if (fsCands.length && !fsMatches.length && rbKey) fsResolve(fsCands[0]); };
   applyKind();
+
+  /* ===== Ergonomie (lot 2) : moins de boutons visibles, aucune fonction supprimée ===== */
+  document.head.insertAdjacentHTML("beforeend", "<style>"
+    + ".vw-zoom{position:absolute;right:8px;bottom:8px;z-index:3;display:flex;gap:6px;align-items:center}.vw-zoom .zq{display:flex;gap:4px}.vw-zoom .zq button,.vw-zoom #torch-btn{padding:4px 9px;font-size:12px;border-radius:14px;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.25)}.vw-zoom .zq button.on{background:var(--primary);border-color:var(--primary)}"
+    + "#scan-more{display:none;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--card-border);border-radius:12px;background:var(--card-bg)}#scan-more.open{display:flex}#scan-more .btn{justify-content:flex-start}#scan-more #vis-reset{width:100%;padding:8px 12px;font-size:13px}#scan-more label{margin:0}"
+    + "#scan-gear.on{background:var(--primary);color:#fff;border-color:var(--primary)}#scan-calib:empty{display:none}"
+    + ".stk-menu{position:relative;flex:none}.stk-pop{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:230px;padding:8px;border-radius:12px;background:var(--card-bg);border:1px solid var(--card-border);box-shadow:0 10px 30px rgba(0,0,0,.35);flex-direction:column;gap:6px}.stk-pop.open{display:flex}.stk-pop .btn{width:100%}"
+    + "body.stk-c2 #list.sgrid{grid-template-columns:repeat(2,1fr)}body.stk-c3 #list.sgrid{grid-template-columns:repeat(3,1fr)}"
+    + "#coll-cat{margin:8px 0}"
+    + "@media (min-width:900px){#s-scan.on{grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto}#s-scan #scan-kind{grid-column:1;grid-row:1}#s-scan .vw-container,body.raf-on #s-scan .vw-container{grid-row:2}#s-scan .scan-quick{grid-row:3}#s-scan #scan-opts{grid-row:4}#s-scan #scan-more{grid-column:1;grid-row:5}#s-scan .scan-toolbar{grid-row:7}#s-scan .basket,#s-scan .scan-results-container{grid-row:1 / 8}}"
+    + "</style>");
+  (function scanLayout() {
+    var vw = $("vw-box"), zq = $("zoom-quick"), torch = $("torch-btn"), quick = document.querySelector(".scan-quick"), opts = $("scan-opts"), calibRow = $("scan-calib");
+    var ov = document.createElement("div"); ov.className = "vw-zoom"; ov.appendChild(torch); ov.appendChild(zq); vw.appendChild(ov);
+    torch.textContent = "🔦";
+    /* panneau « Réglages du scan » pour ce qui sert rarement */
+    var more = document.createElement("div"); more.id = "scan-more";
+    var autoLbl = $("auto").closest("label"), vr = $("vis-reset"), cr = $("calib-reset");
+    vr.textContent = "⌖ Recentrer le viseur"; cr.textContent = "↺ Réinitialiser le calibrage du blanc";
+    [vr, cr].forEach(function (b) { b.style.flex = "none"; b.classList.add("full"); });
+    more.appendChild(autoLbl); more.appendChild(vr); more.appendChild(cr);
+    opts.insertAdjacentElement("afterend", more);
+    /* rangée Couleur auto + Calibrer + ⚙ */
+    var cal = $("calib"); cal.style.flex = "1"; opts.appendChild(cal);
+    var gear = document.createElement("button"); gear.className = "btn sm"; gear.id = "scan-gear"; gear.style.flex = "none"; gear.title = "Réglages du scan"; gear.textContent = "⚙"; opts.appendChild(gear);
+    gear.onclick = function () { var o = more.classList.toggle("open"); gear.classList.toggle("on", o); triggerHaptic(); };
+    opts.style.gap = "8px"; opts.style.justifyContent = "flex-start";
+    calibRow.innerHTML = "";
+    quick.style.justifyContent = "flex-end";
+  })();
+  (function stockLayout() {
+    var exp = $("exp"), cp = $("cp"), row = exp.parentElement, q = $("q"), qrow = q.closest(".row");
+    var box = document.createElement("div"); box.className = "stk-menu";
+    box.innerHTML = '<button class="btn" id="stk-more" title="Plus d\'options" aria-label="Plus d\'options">⋯</button><div class="stk-pop" id="stk-pop"></div>';
+    qrow.appendChild(box); var pop = $("stk-pop");
+    exp.textContent = "📤 Exporter CSV (Rebrickable)"; cp.textContent = "📋 Copier CSV";
+    pop.appendChild(exp); pop.appendChild(cp); row.remove();
+    $("stk-more").onclick = function (e) { e.stopPropagation(); pop.classList.toggle("open"); };
+    pop.addEventListener("click", function () { setTimeout(function () { pop.classList.remove("open"); }, 50); });
+    document.addEventListener("click", function (e) { if (!e.target.closest(".stk-menu")) pop.classList.remove("open"); });
+    /* grille : 2 ou 3 pièces par ligne */
+    var cols = LS("bs_stkcols") === "2" ? 2 : 3;
+    var applyCols = function () { document.body.classList.toggle("stk-c2", cols === 2); document.body.classList.toggle("stk-c3", cols === 3); };
+    applyCols();
+    var _rst = renderStkTools;
+    renderStkTools = function () {
+      _rst(); var t = $("stk-tools"), b = t && t.querySelector("[data-stkview]"); if (!b) return;
+      if (stkView === "grid") b.insertAdjacentHTML("afterend", '<div class="chips" style="margin-top:6px"><span class="sub" style="align-self:center">Par ligne :</span><button class="chip ' + (cols === 2 ? "on" : "") + '" data-stkcols="2">2</button><button class="chip ' + (cols === 3 ? "on" : "") + '" data-stkcols="3">3</button></div>');
+    };
+    document.addEventListener("click", function (e) { var c = e.target.closest && e.target.closest("[data-stkcols]"); if (!c) return; cols = +c.dataset.stkcols; LSset("bs_stkcols", String(cols)); applyCols(); renderStkTools(); });
+    render();
+  })();
 
   /* tes sets déjà enregistrés : ajoute en arrière-plan les pièces de leurs minifigs, un set à la fois */
   setTimeout(async function () {
