@@ -3656,13 +3656,7 @@ window.bkDedupe = function () {
       if (have[m.part] || seen[m.part]) return;
       var cc = canonPart(m.part);
       if (cands.some(function (c) { return c.part !== m.part && canonPart(c.part) === cc; })) { seen[m.part] = 1; res.push({ m: { part: m.part, name: m.name, img: m.img, set: m.set, exact: 1 }, s: 2 }); return; }
-      var a = tok(m.name), best = 0;
-      cands.forEach(function (c) {
-        var b = tok(c.name), inter = a.filter(function (t) { return b.indexOf(t) >= 0; });
-        if (!inter.length || !inter.some(function (t) { return t.length >= 4 && !/^\d+$/.test(t); })) return;
-        var s = inter.length / Math.min(a.length, b.length); if (s > best) best = s;
-      });
-      if (best >= 0.6) { seen[m.part] = 1; res.push({ m: m, s: best }); }
+      /* plus de rapprochement par les mots du nom (proposait des pièces de forme différente) : seules les équivalences prouvées comptent */
     });
     return res.sort(function (x, y) { return y.s - x.s; }).slice(0, 2).map(function (x) { return x.m; });
   }
@@ -3687,7 +3681,7 @@ window.bkDedupe = function () {
   var _ba = basketAdd;
   basketAdd = function (c, col, th, sug) {
     var top = c && c[0]; _ba(c, col, th, sug);
-    try { var b = top && basket.find(function (x) { return x.color === col && (x.part === top.part || x.alias === top.part || canonPart(x.part) === canonPart(top.part)); }); if (b && c.length) { var L = setSug(c, col), m = L.length ? L[0] : null; if (m && m.exact) { b.alts = [{ part: b.part, name: b.name, img: b.img, score: b.score }].concat(b.alts || []); b.alias = b.part; b.part = m.part; b.name = m.name; b.img = m.img; b.setSug = null; bkDedupe(); bkSave(); } else b.setSug = m; renderBasket(); } } catch (e) {}
+    try { var b = top && basket.find(function (x) { return x.color === col && (x.part === top.part || x.alias === top.part || canonPart(x.part) === canonPart(top.part)); }); if (b && c.length) { var L = setSug(c.slice(0, 1), col), m = L.length ? L[0] : null; if (m && m.exact) { b.alts = [{ part: b.part, name: b.name, img: b.img, score: b.score }].concat(b.alts || []); b.alias = b.part; b.part = m.part; b.name = m.name; b.img = m.img; b.setSug = null; bkDedupe(); bkSave(); } else b.setSug = m; renderBasket(); } } catch (e) {}
   };
   var _rb = renderBasket;
   renderBasket = function () {
@@ -4033,6 +4027,158 @@ window.bkDedupe = function () {
     s.use[ck] = (s.use[ck] || []).filter(function (u) { return u.k !== it.k; }).concat([{ k: it.k, n: Math.max(1, Math.min(it.qty, ctx.need)) }]);
     saveSets(); $("modal-use").classList.remove("open"); refresh(); showToast(it.part + " sera utilisée pour ce set");
   });
+})();
+</script>
+
+<script>
+/* ===== BrickStock v5 : scan intelligent — couleurs existantes, numéros prouvés identiques, pièces anciennes (année limite) ===== */
+(function () {
+  document.head.insertAdjacentHTML("beforeend", "<style>.bk-flag{font-size:11px;font-weight:700;color:var(--warning);margin-top:2px}.bk-flag.ok{color:var(--success)}</style>");
+  var load = function (k, d) { try { var v = JSON.parse(localStorage.getItem(k) || "null"); return v && typeof v === "object" ? v : d; } catch (e) { return d; } };
+  var PI = load("bs_pinfo", {}), PC = load("bs_pcols", {});
+  var savePI = function () { try { localStorage.setItem("bs_pinfo", JSON.stringify(PI)); } catch (e) {} };
+  var savePC = function () { try { localStorage.setItem("bs_pcols", JSON.stringify(PC)); } catch (e) {} };
+  window.yMin = function () { return +LS("bs_ymin") || 2009; };
+  var timeout = function (p, ms) { return Promise.race([p, new Promise(function (r) { setTimeout(function () { r(null); }, ms); })]); };
+
+  /* Fiche Rebrickable des pièces (années + numéros prouvés identiques), un seul appel pour plusieurs pièces, mémorisée */
+  var piPend = null;
+  window.partInfos = async function (parts) {
+    if (!rbKey) return;
+    var todo = Array.from(new Set(parts.filter(Boolean))).filter(function (p) { return !PI[p]; }).slice(0, 40);
+    if (!todo.length) return;
+    while (piPend) { try { await piPend; } catch (e) {} todo = todo.filter(function (p) { return !PI[p]; }); if (!todo.length) return; }
+    piPend = (async function () {
+      var j = await rb("parts/?part_nums=" + todo.map(encodeURIComponent).join(",") + "&inc_part_details=1&page_size=100");
+      var got = {}, eqChanged = false;
+      (j.results || []).forEach(function (x) {
+        var L = (x.alternates || []).concat(x.molds || [], x.print_of ? [x.print_of] : []), ex = x.external_ids || {};
+        ["BrickLink", "LDraw"].forEach(function (k) { (ex[k] || []).forEach(function (id) { id = String(id); if (id && id !== x.part_num) L.push(id); }); });
+        L = Array.from(new Set(L));
+        PI[x.part_num] = { y0: +x.year_from || 0, y1: +x.year_to || 0, t: Date.now() }; got[x.part_num] = 1;
+        if (!(x.part_num in EQC) || L.some(function (p) { return EQC[x.part_num].indexOf(p) < 0; })) { EQC[x.part_num] = Array.from(new Set((EQC[x.part_num] || []).concat(L))); eqChanged = true; }
+      });
+      todo.forEach(function (p) { if (!got[p]) PI[p] = { nf: 1, t: Date.now() }; });
+      savePI();
+      if (eqChanged) { LSset("brickstock-equiv", JSON.stringify(EQC)); buildEq(); _T = null; }
+    })();
+    try { await piPend; } catch (e) {} finally { piPend = null; }
+  };
+  /* Couleurs dans lesquelles la pièce existe vraiment (mémorisées) */
+  window.partColors = async function (p) {
+    if (PC[p] && Date.now() - (PC[p].t || 0) < 60 * 864e5) return PC[p].c;
+    if (!rbKey) return null;
+    try { var j = await rb("parts/" + encodeURIComponent(p) + "/colors/?page_size=300"); PC[p] = { c: (j.results || []).map(function (x) { return x.color_id; }).filter(function (c) { return c !== 9999 && c !== -1; }), t: Date.now() }; savePC(); return PC[p].c; }
+    catch (e) { return null; }
+  };
+  /* Pièce ancienne : utilisée seulement avant l'année limite, ou dans aucun set connu */
+  window.partOld = function (p) {
+    var i = PI[p]; if (!i || i.nf) return false;
+    if (i.y1 && i.y1 < yMin()) return true;
+    if (!i.y1 && PC[p] && PC[p].c && !PC[p].c.length) return true;
+    return false;
+  };
+
+  /* Pièces de mes sets, par numéro « canonique » (équivalences prouvées) */
+  function setRefs() {
+    var m = {};
+    setsCol.forEach(function (s) {
+      if (s.manual === "built" && !s.added) return;
+      (s.parts || []).forEach(function (p) {
+        if (p.st) return; var c = canonPart(p.part), o = m[c] = m[c] || { part: p.part, n: p.n, i: p.i, cols: {}, miss: {} };
+        o.cols[p.color] = 1;
+        if (!s.wish && p.qty > availFor(p.k, s.num)) { o.miss[p.color] = 1; if (!o.missSeen) { o.part = p.part; o.n = p.n; o.i = p.i; o.missSeen = 1; } }
+      });
+    });
+    return m;
+  }
+  var labOf = function (id) { var e = PALETTE_LAB.find(function (p) { return p.id == id; }); if (e && e.lab) return e.lab; var h = colRgb(id).slice(1); var r = hex2rgb(h); return rgbToLab(r[0], r[1], r[2]); };
+  var _ac = analyseColor;
+  analyseColor = function (c) { var r = _ac(c); window.__lastLab = r && r.target; return r; };
+
+  /* Cœur : choisit la bonne pièce et la bonne couleur, automatiquement */
+  window.smartPick = async function (cands, col, mode, sug) {
+    var out = { cands: cands.map(function (c) { return Object.assign({}, c); }), col: col, flag: "", sug: (sug || []).slice() };
+    if (!rbKey || !out.cands.length) return out;
+    await timeout(partInfos(out.cands.map(function (c) { return c.part; })), 3500);
+    /* 1. numéro prouvé identique à une pièce de mes sets : on prend le numéro du set */
+    var R = setRefs();
+    out.cands.forEach(function (c) {
+      var r = R[canonPart(c.part)]; c.inSet = !!r;
+      if (r && r.part !== c.part) { c.alias = c.part; c.part = r.part; if (r.n) c.name = r.n; if (r.i) c.img = r.i; }
+      c.old = !c.inSet && partOld(c.alias || c.part);
+    });
+    /* 2. la proposition en tête est ancienne : une proposition récente presque aussi sûre passe devant */
+    var top = out.cands[0], sc = function (c) { return typeof c.score === "number" ? c.score : 0; };
+    var pi0 = PI[top.alias || top.part];
+    if (!top.inSet && pi0 && !pi0.nf && !pi0.y1) { await timeout(partColors(top.alias || top.part), 2500); top.old = partOld(top.alias || top.part); }
+    if (top.old) {
+      var alt = out.cands.slice(1).find(function (c) { return !c.old && (canonPart(c.part) === canonPart(top.part) || sc(c) >= 0.6 * sc(top)); });
+      if (alt) { out.cands = [alt].concat(out.cands.filter(function (c) { return c !== alt; })); top = alt; }
+    }
+    /* 3. couleur : seulement celles qui existent pour cette pièce */
+    var C = await timeout(partColors(top.alias || top.part), 3000);
+    if (C && C.length && top.alias) { var C2 = await timeout(partColors(top.part), 2500); if (C2 && C2.length) C = Array.from(new Set(C2.concat(C))); }
+    if (top.old) out.flag = "old";
+    if (!C || !C.length) return out;
+    var r0 = R[canonPart(top.part)], has = function (c) { return C.indexOf(+c) >= 0; };
+    if (mode === "lock") {
+      if (has(col)) out.col = col;
+      else if (C.length === 1) { out.col = C[0]; out.flag = "uniq"; }
+      else { out.col = col; out.flag = out.flag || "nocol"; }
+    } else if (C.length === 1) { if (out.col != C[0]) out.flag = "uniq"; out.col = C[0]; }
+    else if (mode === "auto") {
+      var near = sug.filter(has);
+      var miss = r0 ? Object.keys(r0.miss).map(Number).filter(function (c) { return has(c) && sug.slice(0, 3).indexOf(c) >= 0; }) : [];
+      if (miss.length) out.col = miss[0];
+      else if (near.length) out.col = near[0];
+      else if (window.__lastLab) { var t = window.__lastLab; out.col = C.slice().sort(function (a, b) { return colDist(t, labOf(a)) - colDist(t, labOf(b)); })[0]; }
+    } else if (col !== 9999 && !has(col)) out.flag = out.flag || "nocol";
+    /* pastilles proposées : les couleurs qui existent, la plus probable d'abord */
+    out.sug = [out.col].concat(sug.filter(has), C).filter(function (c, i, a) { return c !== 9999 && a.indexOf(c) === i; }).slice(0, 9);
+    out.C = C;
+    return out;
+  };
+  var modeNow = function () { return (window.rafOn && window.rafLock) ? "lock" : ($("autocol").checked ? "auto" : "manual"); };
+  var FLAG = { uniq: "🎨 Couleur unique pour cette pièce", nocol: "⚠ N'existe pas dans cette couleur : vérifie", old: "⚠ Pièce ancienne (avant " + yMin() + ") : vérifie" };
+  window.scanFlagText = function (f) { return f === "old" ? "⚠ Pièce ancienne (sets d'avant " + yMin() + " ou aucun set) : vérifie" : (FLAG[f] || ""); };
+
+  /* Rafale */
+  var _ba = basketAdd;
+  basketAdd = async function (c, col, th, sug) {
+    if (!c || !c.length) return _ba(c, col, th, sug);
+    var mode = modeNow(), r;
+    st("Vérification de la pièce…");
+    try { r = await smartPick(c, col, mode, sug || []); } catch (e) { r = { cands: c, col: col, sug: sug, flag: "" }; }
+    _ba(r.cands, r.col, th, r.sug);
+    var top = r.cands[0], b = basket.find(function (x) { return x.color === r.col && (x.part === top.part || x.alias === top.part || canonPart(x.part) === canonPart(top.part)); });
+    if (b) { if (top.alias && !b.alias) b.alias = top.alias; b.flag = r.flag || ""; b.sug = r.sug; bkSave(); renderBasket(); }
+  };
+  var _rbk = renderBasket;
+  renderBasket = function () {
+    _rbk();
+    document.querySelectorAll(".bk-item[data-id]").forEach(function (el) {
+      var b = basket.find(function (x) { return String(x.id) === el.dataset.id; });
+      if (b && b.flag && !el.querySelector(".bk-flag")) { var g = el.querySelector(".bk-top .grow"); if (g) g.insertAdjacentHTML("beforeend", '<div class="bk-flag ' + (b.flag === "uniq" ? "ok" : "") + '">' + esc(scanFlagText(b.flag)) + "</div>"); }
+    });
+  };
+  /* une couleur choisie à la main sur la ligne efface l'avertissement */
+  document.addEventListener("click", function (e) { var sw = e.target.closest && e.target.closest(".bk-item .quick-swatch[data-cid]"); if (!sw) return; var row = sw.closest(".bk-item"), b = row && basket.find(function (x) { return String(x.id) === row.dataset.id; }); if (b) b.flag = ""; }, true);
+
+  /* Mode normal (sans rafale) */
+  var _show = show;
+  show = async function (items) {
+    if (!items || !items.length || !rbKey) return _show(items);
+    var c = items.map(function (it) { return { part: rbNum(it), name: it.name, img: it.img_url, score: it.score }; }), r;
+    st("Vérification de la pièce…");
+    try { r = await smartPick(c, curCol, modeNow(), suggested.slice()); } catch (e) { return _show(items); }
+    var curCol0 = curCol;
+    if (r.col !== curCol && r.col != null) updateSelectedColor(r.col);
+    suggested = r.sug;
+    if (r.col !== 9999 && (r.flag || r.col !== curCol0)) colorNote = colName(r.col) + (r.flag ? " · " + scanFlagText(r.flag) : "");
+    else if (r.flag) colorNote = (colorNote ? colorNote + " · " : "") + scanFlagText(r.flag);
+    _show(r.cands.map(function (x) { return { id: x.part, name: x.name + (x.old ? " (ancienne)" : ""), img_url: x.img, score: x.score }; }));
+  };
 })();
 </script>
 
