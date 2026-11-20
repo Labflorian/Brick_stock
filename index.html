@@ -963,6 +963,8 @@ body.raf-on .vw-container { height: 180px; height: clamp(160px, 26dvh, 300px); }
     <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0 4px"><input type="checkbox" id="ap-hap"> Vibration au toucher</label>
     <div class="sub" style="margin-top:6px">Zone de scan autour de la cible</div>
     <div class="seg" id="ap-zone"><button data-v="narrow">Petite</button><button data-v="normal">Moyenne</button><button data-v="wide">Grande</button><button data-v="full">Tout</button></div>
+    <div class="sub" style="margin-top:10px">Sets à partir de l'année (recherche, suggestions, scan)</div>
+    <input id="ymin-in" type="number" inputmode="numeric" min="1949" max="2030" step="1" placeholder="2009" style="max-width:120px">
 
     <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 12px 0;">
 
@@ -2943,15 +2945,16 @@ const hideSugg = () => { $("set-sugg").innerHTML = ""; };
 async function setSuggest(q) {
   const tok = ++sgTok, digits = /^[0-9]+$/.test(q), enc = encodeURIComponent(q);
   try {
-    let j; try { j = await rb("sets/?search=" + enc + "&page_size=100&ordering=-year"); } catch(e) { j = await rb("sets/?search=" + enc + "&page_size=100"); }
+    const ymin = window.sgOld ? "" : "&min_year=" + (window.yMin ? yMin() : 2009);
+    let j; try { j = await rb("sets/?search=" + enc + "&page_size=100&ordering=-year" + ymin); } catch(e) { j = await rb("sets/?search=" + enc + "&page_size=100" + ymin); }
     if (tok !== sgTok) return;
     let L = j.results || []; if (digits) L = L.filter(x => x.set_num.startsWith(q));
-    L = L.sort((a, b) => b.year - a.year).slice(0, 12);
+    L = L.sort((a, b) => b.year - a.year).slice(0, 24);
     sgList = L; renderSugg();
   } catch(e) { if (tok === sgTok) hideSugg(); }
 }
 $("q-set").oninput = () => {
-  clearTimeout(sgT); const q = $("q-set").value.trim();
+  clearTimeout(sgT); window.sgOld = false; const q = $("q-set").value.trim();
   if (!rbKey || q.length < (/^[0-9]+$/.test(q) ? 2 : 3)) { sgTok++; hideSugg(); return; }
   sgT = setTimeout(() => setSuggest(q), 350);
 };
@@ -3343,14 +3346,23 @@ document.addEventListener("keydown", e => {
 
 /* ---------- Sets : recherche en lignes + fiche aperçu ---------- */
 var sgList = [];
+var sgView = LS("bs_sgview") || "grid";
 function renderSugg() {
-  $("set-sugg").innerHTML = sgList.length ? sgList.map((x, i) => {
-    const o = findSet(x.set_num);
-    return `<div class="sg-row" data-sn="${i}">${figImg(x.set_img_url)}<div class="grow"><div class="pn">${esc(x.name)}</div><div class="sub">${esc(x.set_num)} · ${x.year} · ${x.num_parts} pièces</div></div>
+  const old = window.sgOld ? "" : `<a href="#" class="sg-old" data-sgold="1">Voir aussi les sets d'avant ${window.yMin ? yMin() : 2009}</a>`;
+  if (!sgList.length) { $("set-sugg").innerHTML = (sgTok && $("q-set").value.trim()) ? `<div class="sub" style="padding:10px">Aucun set trouvé.</div>${old}` : ""; return; }
+  const tag = o => o ? `<span class="sg-badge">${o.wish ? "⭐ Envie" : "✓ Collection"}</span>` : "";
+  const tools = `<div class="sg-tools"><span class="sub">${plural(sgList.length, "set")}</span><button class="btn sm" data-sgview="1">${sgView === "grid" ? "☰ Liste" : "▦ Grille"}</button></div>`;
+  const body = sgView === "grid" ? '<div class="sg-grid">' + sgList.map((x, i) => `<div class="sg-card" data-sn="${i}">${tag(findSet(x.set_num))}${figImg(x.set_img_url)}<div class="sg-n">${esc(x.name)}</div><div class="sub">${esc(x.set_num)} · ${x.year}</div></div>`).join("") + "</div>"
+    : sgList.map((x, i) => {
+      const o = findSet(x.set_num);
+      return `<div class="sg-row" data-sn="${i}">${figImg(x.set_img_url)}<div class="grow"><div class="pn">${esc(x.name)}</div><div class="sub">${esc(x.set_num)} · ${x.year} · ${x.num_parts} pièces</div></div>
       ${o ? `<span class="sg-tag">${o.wish ? "⭐ Envie" : "✓ Collection"}</span>` : `<button class="btn sm pri sg-add" data-sa="${i}">➕ Ajouter</button><button class="btn sm sg-add" data-sw="${i}" title="Ajouter aux envies">⭐</button>`}</div>`;
-  }).join("") : '<div class="sub" style="padding:10px">Aucun set trouvé.</div>';
+    }).join("");
+  $("set-sugg").innerHTML = tools + body + old;
 }
 $("set-sugg").onclick = e => {
+  if (e.target.closest("[data-sgview]")) { sgView = sgView === "grid" ? "list" : "grid"; LSset("bs_sgview", sgView); renderSugg(); return; }
+  if (e.target.closest("[data-sgold]")) { e.preventDefault(); window.sgOld = true; const q = $("q-set").value.trim(); if (q && rbKey) setSuggest(q); return; }
   const a = e.target.closest("[data-sa],[data-sw]");
   if (a) { const wish = a.dataset.sw !== undefined, x = sgList[+(wish ? a.dataset.sw : a.dataset.sa)]; if (x) addSetToCollection(wish, x).then(renderSugg); return; }
   const r = e.target.closest("[data-sn]"); if (r) { const x = sgList[+r.dataset.sn]; if (x) openSetPreview(x); }
@@ -4033,7 +4045,16 @@ window.bkDedupe = function () {
 <script>
 /* ===== BrickStock v5 : scan intelligent — couleurs existantes, numéros prouvés identiques, pièces anciennes (année limite) ===== */
 (function () {
-  document.head.insertAdjacentHTML("beforeend", "<style>.bk-flag{font-size:11px;font-weight:700;color:var(--warning);margin-top:2px}.bk-flag.ok{color:var(--success)}</style>");
+  document.head.insertAdjacentHTML("beforeend", "<style>.bk-flag{font-size:11px;font-weight:700;color:var(--warning);margin-top:2px}.bk-flag.ok{color:var(--success)}"
+    + ".sg-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px 0}"
+    + ".sg-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:8px}@media(min-width:600px){.sg-grid{grid-template-columns:repeat(3,1fr)}}@media(min-width:900px){.sg-grid{grid-template-columns:repeat(4,1fr)}}"
+    + ".sg-card{position:relative;border:1px solid var(--card-border);border-radius:var(--radius-md,12px);padding:6px;cursor:pointer;background:var(--card-bg)}"
+    + ".sg-card img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#fff;border-radius:8px}"
+    + ".sg-card .sg-n{font-size:13px;font-weight:700;margin-top:6px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}"
+    + ".sg-card .sub{font-size:11px;margin-top:2px}.sg-badge{position:absolute;top:10px;left:10px;background:var(--success);color:#fff;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800}"
+    + ".sg-old{display:block;text-align:center;font-size:12px;padding:6px 10px 10px;color:var(--text-muted)}</style>");
+  (function () { var y = $("ymin-in"); if (!y) return; y.value = +LS("bs_ymin") || 2009;
+    y.onchange = function () { var v = parseInt(y.value, 10); if (!(v >= 1949 && v <= 2030)) v = 2009; y.value = v; LSset("bs_ymin", String(v)); showToast("Sets à partir de " + v); }; })();
   var load = function (k, d) { try { var v = JSON.parse(localStorage.getItem(k) || "null"); return v && typeof v === "object" ? v : d; } catch (e) { return d; } };
   var PI = load("bs_pinfo", {}), PC = load("bs_pcols", {});
   var savePI = function () { try { localStorage.setItem("bs_pinfo", JSON.stringify(PI)); } catch (e) {} };
