@@ -1116,7 +1116,7 @@ body.raf-on .vw-container { height: 180px; height: clamp(160px, 26dvh, 300px); }
 
     <div class="row" id="scan-opts" style="margin: 0; align-items: center; justify-content: space-between;">
       <label class="chk">
-        <input type="checkbox" id="autocol" checked> Couleur auto
+        <input type="checkbox" id="autocol" checked> Couleur auto de la pièce
       </label>
       <label class="chk">
         <input type="checkbox" id="auto"> Auto (2,5s)
@@ -4174,32 +4174,25 @@ window.bkDedupe = function () {
 
   /* ===== Ergonomie (lot 2) : moins de boutons visibles, aucune fonction supprimée ===== */
   document.head.insertAdjacentHTML("beforeend", "<style>"
-    + ".vw-zoom{position:absolute;right:8px;bottom:8px;z-index:3;display:flex;gap:6px;align-items:center}.vw-zoom .zq{display:flex;gap:4px}.vw-zoom .zq button,.vw-zoom #torch-btn{padding:4px 9px;font-size:12px;border-radius:14px;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.25)}.vw-zoom .zq button.on{background:var(--primary);border-color:var(--primary)}"
-    + "#scan-more{display:none;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--card-border);border-radius:12px;background:var(--card-bg)}#scan-more.open{display:flex}#scan-more .btn{justify-content:flex-start}#scan-more #vis-reset{width:100%;padding:8px 12px;font-size:13px}#scan-more label{margin:0}"
-    + "#scan-gear.on{background:var(--primary);color:#fff;border-color:var(--primary)}#scan-calib:empty{display:none}"
+    + "#torch-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}#torch-ind{position:absolute;top:8px;left:8px;z-index:3;background:var(--primary);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:12px;pointer-events:none}"
+    + "#s-scan .scan-bottom{margin-top:auto}"
     + ".stk-menu{position:relative;flex:none}.stk-pop{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:230px;padding:8px;border-radius:12px;background:var(--card-bg);border:1px solid var(--card-border);box-shadow:0 10px 30px rgba(0,0,0,.35);flex-direction:column;gap:6px}.stk-pop.open{display:flex}.stk-pop .btn{width:100%}"
     + "body.stk-c2 #list.sgrid{grid-template-columns:repeat(2,1fr)}body.stk-c3 #list.sgrid{grid-template-columns:repeat(3,1fr)}"
     + "#coll-cat{margin:8px 0}"
-    + "@media (min-width:900px){#s-scan.on{grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto}#s-scan #scan-kind{grid-column:1;grid-row:1}#s-scan .vw-container,body.raf-on #s-scan .vw-container{grid-row:2}#s-scan .scan-quick{grid-row:3}#s-scan #scan-opts{grid-row:4}#s-scan #scan-more{grid-column:1;grid-row:5}#s-scan .scan-toolbar{grid-row:7}#s-scan .basket,#s-scan .scan-results-container{grid-row:1 / 8}}"
+    + "@media (min-width:900px){#s-scan.on{grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto}#s-scan #scan-kind{grid-column:1;grid-row:1}#s-scan .vw-container,body.raf-on #s-scan .vw-container{grid-row:2}#s-scan .scan-quick{grid-row:3}#s-scan #scan-opts{grid-row:4}#s-scan #scan-calib{grid-column:1;grid-row:5}#s-scan .scan-toolbar{grid-row:7}#s-scan .basket,#s-scan .scan-results-container{grid-row:1 / 8}}"
     + "</style>");
-  (function scanLayout() {
-    var vw = $("vw-box"), zq = $("zoom-quick"), torch = $("torch-btn"), quick = document.querySelector(".scan-quick"), opts = $("scan-opts"), calibRow = $("scan-calib");
-    var ov = document.createElement("div"); ov.className = "vw-zoom"; ov.appendChild(torch); ov.appendChild(zq); vw.appendChild(ov);
-    torch.textContent = "🔦";
-    /* panneau « Réglages du scan » pour ce qui sert rarement */
-    var more = document.createElement("div"); more.id = "scan-more";
-    var autoLbl = $("auto").closest("label"), vr = $("vis-reset"), cr = $("calib-reset");
-    vr.textContent = "⌖ Recentrer le viseur"; cr.textContent = "↺ Réinitialiser le calibrage du blanc";
-    [vr, cr].forEach(function (b) { b.style.flex = "none"; b.classList.add("full"); });
-    more.appendChild(autoLbl); more.appendChild(vr); more.appendChild(cr);
-    opts.insertAdjacentElement("afterend", more);
-    /* rangée Couleur auto + Calibrer + ⚙ */
-    var cal = $("calib"); cal.style.flex = "1"; opts.appendChild(cal);
-    var gear = document.createElement("button"); gear.className = "btn sm"; gear.id = "scan-gear"; gear.style.flex = "none"; gear.title = "Réglages du scan"; gear.textContent = "⚙"; opts.appendChild(gear);
-    gear.onclick = function () { var o = more.classList.toggle("open"); gear.classList.toggle("on", o); triggerHaptic(); };
-    opts.style.gap = "8px"; opts.style.justifyContent = "flex-start";
-    calibRow.innerHTML = "";
-    quick.style.justifyContent = "flex-end";
+  (function scanTweaks() {
+    /* « Auto (2,5 s) » rangé dans ⚙️ Paramètres (le reste de l'onglet Scanner est comme avant) */
+    var autoLbl = $("auto").closest("label"), y = $("ymin-in");
+    if (autoLbl && y) { var h = document.createElement("div"); h.className = "sub"; h.style.marginTop = "10px"; h.textContent = "Scanner : scan automatique"; y.insertAdjacentElement("afterend", h); h.insertAdjacentElement("afterend", autoLbl); autoLbl.style.margin = "4px 0 0"; }
+    /* Flash : bien visible quand il est allumé (bouton rouge + pastille sur l'image) */
+    var torch = $("torch-btn"), vw = $("vw-box");
+    vw.insertAdjacentHTML("beforeend", '<div id="torch-ind">🔦 Flash allumé</div>');
+    var syncTorch = function () { var on = torch.classList.contains("on"); torch.textContent = on ? "🔦 Flash allumé" : "🔦 Flash"; $("torch-ind").style.display = on ? "" : "none"; };
+    new MutationObserver(syncTorch).observe(torch, { attributes: true, attributeFilter: ["class"] }); syncTorch();
+    /* badge « Zoom » : seulement pour un zoom aux doigts (sinon il répète 1x / 2x / 3x) */
+    var zb = $("zoom-badge"), syncZ = function () { var z = parseFloat((zb.textContent.match(/[\d.]+/) || ["1"])[0]); zb.style.display = [1, 2, 3].some(function (k) { return Math.abs(z - k) < 0.05; }) ? "none" : ""; };
+    new MutationObserver(syncZ).observe(zb, { childList: true, characterData: true, subtree: true }); syncZ();
   })();
   (function stockLayout() {
     var exp = $("exp"), cp = $("cp"), row = exp.parentElement, q = $("q"), qrow = q.closest(".row");
