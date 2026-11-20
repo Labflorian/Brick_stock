@@ -2538,9 +2538,9 @@ function renderCollection() {
     return `<div class="fcard" data-open="${esc(s.num)}"><img src="${esc(s.img)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt=""><div class="fn">${esc(s.name)}</div>
       <div class="fm" style="color:${col}">${t}</div>${c === "built" ? "" : `<div class="progress-container" style="margin-top:6px"><div class="progress-bar" style="width:${pct}%; background:${col};"></div></div>`}</div>`;
   };
-  const seg = [["todo", "À construire"], ["missing", "À compléter"], ["ready", "⚡ Prêts"], ["built", "Construits"], ["wish", "Envies"]].map(([c, l]) => `<option value="${c}" ${colCat === c ? "selected" : ""}>${l} (${cnt[c]})</option>`).join("");
+  const seg = [["wish", "Envies"], ["missing", "À compléter"], ["ready", "⚡ Prêts"], ["todo", "À construire"], ["built", "Construits"]].map(([c, l]) => `<button data-cat="${c}" class="${colCat === c ? 'on' : ''}"><span>${l}</span><b>${cnt[c]}</b></button>`).join("");
   el.innerHTML = `<div class="scan-results-title" style="margin:16px 0 0"><span>Ma collection · ${plural(setsCol.length, "set")}</span></div>
-    <select id="coll-cat">${seg}</select>${top}
+    <div class="seg s5">${seg}</div>${top}
     ${list.length ? (setView === "grid" ? '<div class="fgrid">' + list.map(mini).join("") + "</div>" : list.map(card).join("")) : '<div class="empty">' + (ctoks.length ? "Aucun set ne correspond à ta recherche." : colCat === "ready" ? "Aucun set n'est complet à 100 % pour l'instant." : colCat === "wish" ? "Ajoute des sets à ta liste d'envies depuis la recherche (bouton ⭐)." : "Aucun set dans cette catégorie.") + '</div>'}`;
 }
 
