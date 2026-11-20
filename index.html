@@ -2361,7 +2361,21 @@ let _CP = new Map();
 const canonPart = p => { let r = _CP.get(p); if (r === undefined) { const b = printBase(p); r = EQ[p] || (b ? (EQ[b] || b) : p); _CP.set(p, r); } return r; };
 const canonK = k => { const i = k.indexOf("|"); return canonPart(k.slice(0, i)) + k.slice(i); };
 const saveSets = () => { _T = null; tStamp = Date.now(); LSset("bs_t", String(tStamp)); LSset("brickstock-sets", JSON.stringify(setsCol)); push(); if (window.autoEquivSoon) autoEquivSoon(); };
-const needsOf = s => { const t = _tick(); let r = t.nd.get(s); if (!r) { const m = {}; s.parts.forEach(p => { if (p.st) return; const k = canonK(p.k); (m[k] = m[k] || { k, qty: 0, p }).qty += p.qty; }); r = Object.values(m); t.nd.set(s, r); } return r; };
+const needsOf = s => { const t = _tick(); let r = t.nd.get(s); if (!r) { const m = {}; s.parts.forEach(p => { if (p.st) return; const k = canonK(p.k); (m[k] = m[k] || { k, qty: 0, p }).qty += p.qty; }); const cv = figCover(s); if (cv) Object.keys(cv).forEach(k => { const ck = canonK(k), o = m[ck]; if (o) { o.qty -= cv[k]; if (o.qty <= 0) delete m[ck]; } }); r = Object.values(m); t.nd.set(s, r); } return r; };
+// minifigs du set que tu as déjà entières dans ta collection de minifigs : leurs pièces ne sont plus « à avoir » (attribuées aux sets dans l'ordre de la collection)
+const figCover = s => {
+  if (!s || !s.figs || !s.figs.length) return null;
+  let col; try { col = figs; } catch (e) { return null; }
+  const t = _tick();
+  if (!t.fc) {
+    t.fc = new Map(); const own = {};
+    (col || []).forEach(f => { own[f.num] = (own[f.num] || 0) + (f.qty || 1); });
+    setsCol.forEach(x => { if (x.wish || !x.figs) return; const c = {}; let any = 0;
+      x.figs.forEach(f => { const u = Math.min(own[f.num] || 0, f.qty || 1); if (u > 0) { own[f.num] -= u; any = 1; (f.parts || []).forEach(p => { if (!p.st) c[p.k] = (c[p.k] || 0) + p.qty * u; }); } });
+      if (any) t.fc.set(x, c); });
+  }
+  return t.fc.get(s) || null;
+};
 const stockMap = () => { const t = _tick(); if (!t.sm) { const m = {}; stock.forEach(x => { const k = canonK(x.k); m[k] = (m[k] || 0) + x.qty; }); t.sm = m; } return t.sm; };
 const stockQty = k => stockMap()[canonK(k)] || 0;
 const isCommitted = s => !s.wish && (s.reserved || (s.manual === "built" && s.added));
@@ -2403,11 +2417,13 @@ function tryReserve(s) { // toujours possible : priorité aux réservations les 
 }
 
 function addPieces(s) {
+  const cv = figCover(s) || {};
   s.parts.forEach(p => {
     if (p.st) return;
+    const q = p.qty - (cv[p.k] || 0); if (q <= 0) return;
     const it = stock.find(x => x.k === p.k);
-    if (it) it.qty += p.qty;
-    else stock.push({ k: p.k, part: p.part, name: p.n || p.part, img: goodImg(p.i), color: p.color, qty: p.qty, addedAt: Date.now(), cv: 2 });
+    if (it) it.qty += q;
+    else stock.push({ k: p.k, part: p.part, name: p.n || p.part, img: goodImg(p.i), color: p.color, qty: q, addedAt: Date.now(), cv: 2 });
   });
   save(); render();
 }
@@ -2429,13 +2445,34 @@ function dismantle(s) {
   s.added = false; s.reserved = false; s.manual = null; showToast("Set démonté : pièces remises au stock");
 }
 const invParts = j => aggParts((j.results || []).filter(p => !p.is_spare).map(p => ({ k: p.part.part_num + "|" + p.color.id, part: p.part.part_num, color: p.color.id, n: p.part.name, i: goodImg(p.part.part_img_url), st: p.part.part_cat_id === 58 || /^stickers?\b|sticker sheet/i.test(p.part.name || ""), qty: p.quantity })));
+// minifigs d'un set et leurs pièces (Rebrickable les exclut de l'inventaire du set)
+async function setFigsOf(num) {
+  const j = await rb("sets/" + num + "/minifigs/?page_size=100"), F = [];
+  for (const f of (j.results || [])) {
+    let parts = [];
+    try { await sleep(300); parts = invParts(await rb("minifigs/" + f.set_num + "/parts/?page_size=200")); } catch (e) {}
+    F.push({ num: f.set_num, name: f.set_name, img: f.set_img_url, qty: f.quantity || 1, parts });
+  }
+  return F;
+}
+const withFigs = (parts, F) => aggParts(parts.concat(...(F || []).map(f => f.parts.map(p => ({ ...p, qty: p.qty * f.qty })))));
+const figLoading = new Set();
+async function loadSetFigs(s) { // complète un set déjà enregistré avec les pièces de ses minifigs (une seule fois)
+  if (!s || s.fv || s.tmp || figLoading.has(s.num) || !rbKey) return;
+  figLoading.add(s.num);
+  try { const F = await setFigsOf(s.num); if (!s.fv) { s.figs = F; s.parts = withFigs(s.parts, F); s.fv = 1; _T = null; if (findSet(s.num)) saveSets(); renderCollection(); if (openNum === s.num && $("modal-set").classList.contains("open")) renderDetail(); } }
+  catch (e) {}
+  figLoading.delete(s.num);
+}
 async function refreshInv(s) {
   if (!rbKey) return showToast("Ajoute ta clé Rebrickable dans ⚙️ Paramètres");
   showToast("Mise à jour de l'inventaire…");
   try {
     const r = await fetch("https://rebrickable.com/api/v3/lego/sets/" + s.num + "/parts/?page_size=1000&key=" + rbKey);
     if (!r.ok) throw new Error("HTTP " + r.status);
-    s.parts = invParts(await r.json()); saveSets(); renderCollection(); renderDetail(); showToast("Inventaire mis à jour ✓");
+    s.parts = invParts(await r.json());
+    try { s.figs = await setFigsOf(s.num); s.parts = withFigs(s.parts, s.figs); s.fv = 1; } catch (e) {}
+    saveSets(); renderCollection(); renderDetail(); showToast("Inventaire mis à jour ✓");
   } catch(e) { showToast("Erreur : " + e.message); }
 }
 
@@ -2448,8 +2485,10 @@ async function addSetToCollection(wish, dd) {
     const r = await fetch("https://rebrickable.com/api/v3/lego/sets/" + d.set_num + "/parts/?page_size=1000&key=" + rbKey);
     if (!r.ok) throw new Error("HTTP " + r.status);
     const j = await r.json();
-    const parts = invParts(j);
-    setsCol.push({ num: d.set_num, name: d.name, img: d.set_img_url, year: d.year || "", manual: null, added: false, reserved: false, wish: !!wish, parts });
+    let parts = invParts(j), F = null;
+    try { F = await setFigsOf(d.set_num); parts = withFigs(parts, F); } catch (e) {}
+    if (findSet(d.set_num)) return;
+    setsCol.push({ num: d.set_num, name: d.name, img: d.set_img_url, year: d.year || "", manual: null, added: false, reserved: false, wish: !!wish, parts, ...(F ? { figs: F, fv: 1 } : {}) });
     saveSets(); renderCollection(); if (dd) showToast(wish ? "Ajouté à tes envies ⭐" : "Ajouté à ta collection ✓"); else openSetDetail(d.set_num);
   } catch(e) { showToast("Erreur : " + e.message); }
 }
@@ -2527,54 +2566,77 @@ function applySetMode() {
   $("set-mode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.sm === setMode));
 }
 $("set-mode").onclick = e => { const b = e.target.closest("[data-sm]"); if (!b) return; setMode = b.dataset.sm; LSset("bs_setmode", setMode); applySetMode(); };
-function openSetDetail(num) { openNum = num; renderDetail(); lift("modal-set"); }
+let setTab = "parts", figOpenI = -1;
+function openSetDetail(num) { if (openNum !== num) { setTab = "parts"; figOpenI = -1; } openNum = num; renderDetail(); lift("modal-set"); }
+const partTile = (p, av, eq, clickable) => `<div class="set-part-item" ${clickable ? `data-p="${esc(p.k)}" style="cursor:pointer"` : ""}>
+      <span class="badge-status ${av >= p.qty ? 'has' : (av > 0 ? 'missing' : '')}"${eq ? ' title="Complété avec une pièce équivalente (version unie ou imprimée)"' : ""}>${av}/${p.qty}${eq ? " ≈" : ""}</span>
+      ${pImg(p.part, p.color, p.i)}
+      <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
+      <div style="color:var(--text-muted); font-size:10px; margin-top:2px;">${esc(colName(p.color))}</div></div>`;
 function renderDetail() {
   const s = getSet(openNum), box = $("modal-set-card"); if (!s) return;
   const c = setCat(s), wish = c === "wish", built = c === "built", inModel = built && !s.added, clean = String(s.num).split("-")[0];
-  const loose = s.parts.filter(p => !p.st), stick = s.parts.filter(p => p.st);
+  const cv = inModel ? {} : (figCover(s) || {});
+  const loose = s.parts.filter(p => !p.st).map(p => cv[p.k] ? { ...p, qty: p.qty - cv[p.k] } : p).filter(p => p.qty > 0), stick = s.parts.filter(p => p.st);
   const need = loose.reduce((n, p) => n + p.qty, 0), miss = inModel ? 0 : setMissing(s);
   const sts = [["auto", "Auto"], ["built", "Construit"], ["todo", "À construire"], ["missing", "À compléter"]];
   const parts = loose.map(p => { const av = inModel ? p.qty : Math.min(p.qty, availFor(p.k, s.num)); return { p, av, eq: !inModel && av > 0 && ((stock.find(x => x.k === p.k) || { qty: 0 }).qty < av) }; });
   parts.sort((a, b) => ((a.av >= a.p.qty) - (b.av >= b.p.qty)) * (partSort === "miss" ? 1 : -1));
   const nMiss = parts.filter(x => x.av < x.p.qty).length, shown = onlyMiss ? parts.filter(x => x.av < x.p.qty) : parts;
+  if (!s.tmp && !s.fv && rbKey) setTimeout(() => loadSetFigs(s), 0);
+  const F = s.figs, nf = F ? F.reduce((n, f) => n + (f.qty || 1), 0) : 0, showTabs = !F || F.length > 0;
+  if (F && !F.length && setTab === "figs") setTab = "parts";
+  let figsHtml = "";
+  if (setTab === "figs") {
+    if (!F) figsHtml = `<div class="sub" style="text-align:center;padding:14px">${rbKey ? "Chargement des minifigs…" : "Ajoute ta clé Rebrickable dans ⚙️ Paramètres pour voir les minifigs."}</div>`;
+    else figsHtml = F.map((f, i) => {
+      const inColl = (typeof figs !== "undefined") && figs.some(x => x.num === f.num), fl = (f.parts || []).filter(p => !p.st);
+      let fneed = 0, fhave = 0; fl.forEach(p => { const q = p.qty * (f.qty || 1); fneed += q; fhave += inModel ? q : Math.min(q, availFor(p.k, s.num)); });
+      const ok = inModel || inColl || fhave >= fneed, col = ok ? "var(--success)" : (fhave ? "var(--warning)" : "var(--pt)");
+      const st = inModel ? "🧱 Dans le modèle monté" : inColl ? "✓ Dans ta collection de minifigs" : fhave >= fneed ? "✓ Toutes les pièces" : plural(fneed - fhave, "pièce") + " manquante" + (fneed - fhave > 1 ? "s" : "") + " · " + fhave + "/" + fneed;
+      const open = figOpenI === i;
+      return `<div class="set-card fig-in-set" data-fopen="${i}" style="cursor:pointer"><div class="set-header">${figImg(f.img)}<div class="grow"><div class="pn">${esc(f.name)}${(f.qty || 1) > 1 ? " ×" + f.qty : ""}</div><div class="sub">${esc(f.num)} · ${plural(fl.length, "référence")}</div><div class="meta" style="color:${col}">${st}</div></div><span class="sub">${open ? "▾" : "▸"}</span></div>
+        ${open ? `<div class="set-parts-grid" style="margin-top:8px">${fl.map(p => { const q = p.qty * (f.qty || 1), av = inModel || inColl ? q : Math.min(q, availFor(p.k, s.num)); return partTile({ ...p, qty: q }, av, false, !inModel); }).join("") || '<div class="sub">Pièces non disponibles sur Rebrickable.</div>'}</div>` : ""}</div>`;
+    }).join("");
+  }
   box.innerHTML = `<div class="modal-header"><h3>${esc(s.name)}</h3><button class="icon-btn" data-d="close">✕</button></div>
     <div class="set-header"><img src="${esc(s.img)}" onerror="this.src='https://cdn.rebrickable.com/media/sets/no_image.jpg'" alt="">
-      <div class="grow"><div class="sub">Set N° ${esc(s.num)}${s.year ? " · " + esc(s.year) : ""}</div><div class="meta">${need} pièces · ${loose.length} références</div>
+      <div class="grow"><div class="sub">Set N° ${esc(s.num)}${s.year ? " · " + esc(s.year) : ""}</div><div class="meta">${need} pièces · ${loose.length} références${F && F.length ? " · " + plural(nf, "minifig") : ""}</div>
       <div class="meta" style="color:${miss ? 'var(--warning)' : 'var(--success)'}">${wish ? "⭐ Envie · " : ""}${built ? "🧱 Construit" + (s.added ? " · pièces au stock" : "") : (miss ? plural(miss, "pièce") + " manquante" + (miss > 1 ? "s" : "") : "✓ Pièces au complet")}${s.reserved ? " · " + rsvTag(s, 1) : ""}</div></div></div>
-    ${s.tmp ? `<div class="row" style="margin-top:10px"><button class="btn pri" data-d="tmpadd">➕ Ajouter à ma collection</button><button class="btn" data-d="tmpwish" style="flex:none">⭐ Envie</button></div>${s.msg ? `<div class="sub" style="margin-top:6px">${esc(s.msg)}</div>` : ""}` : wish ? `<button class="btn pri full" style="margin-top:10px" data-d="tocol">⭐ Passer dans ma collection</button>` : `
+    <div class="set-links"><a href="https://www.lego.com/fr-fr/service/buildinginstructions/${esc(clean)}" target="_blank" rel="noopener" class="btn sm">📄 Notice</a><a href="https://rebrickable.com/sets/${esc(s.num)}" target="_blank" rel="noopener" class="btn sm">🌐 Rebrickable</a>${s.tmp ? `<button class="btn sm" data-d="tmpwish">⭐ Envie</button>` : ""}</div>
+    ${s.tmp ? `<button class="btn pri full" style="margin-top:8px" data-d="tmpadd">➕ Ajouter à ma collection</button>${s.msg ? `<div class="sub" style="margin-top:6px">${esc(s.msg)}</div>` : ""}` : wish ? `<button class="btn pri full" style="margin-top:8px" data-d="tocol">⭐ Passer dans ma collection</button>` : `
     <div class="sub" style="margin:10px 0 4px">Catégorie (Auto = selon ton stock)</div>
-    <div class="seg" style="margin:0 0 10px">${sts.map(([v, l]) => `<button data-st="${v}" class="${(s.manual || "auto") === v ? 'on' : ''}" style="font-size:11px">${l}</button>`).join("")}</div>`}
-    <div class="set-actions">
-      <a href="https://www.lego.com/fr-fr/service/buildinginstructions/${esc(clean)}" target="_blank" rel="noopener" class="btn pri sm full">📄 Notice PDF</a>
-      <a href="https://rebrickable.com/sets/${esc(s.num)}" target="_blank" rel="noopener" class="btn sm full">🌐 Rebrickable</a>
-    </div>
+    <div class="seg" style="margin:0 0 6px">${sts.map(([v, l]) => `<button data-st="${v}" class="${(s.manual || "auto") === v ? 'on' : ''}" style="font-size:11px">${l}</button>`).join("")}</div>`}
     ${wish || s.tmp ? "" : (built
       ? (s.added ? `<button class="btn full" style="margin-top:8px" data-d="unstock">📤 Retirer ses pièces du stock (set monté)</button>` : `<button class="btn full" style="margin-top:8px" data-d="dismantle">🔧 Démonter : remettre les pièces au stock</button>`)
-      : `<button class="btn full" style="margin-top:8px" data-d="addall">📦 J'ai les pièces : les ajouter et les réserver</button>
-         <button class="btn full ${s.reserved ? '' : 'pri'}" style="margin-top:6px" data-d="res">${s.reserved ? "Libérer les pièces" : "🔒 Réserver les pièces"}</button>`)}
-    ${s.tmp ? "" : miss || s.parts.some(p => !p.n) ? `<details style="margin-top:8px"><summary class="sub" style="cursor:pointer">Plus d'actions</summary>
+      : `<button class="btn full ${s.reserved ? '' : 'pri'}" style="margin-top:6px" data-d="res">${s.reserved ? "Libérer les pièces" : "🔒 Réserver les pièces"}</button>`)}
+    ${s.tmp ? "" : `<details style="margin-top:8px"><summary class="sub" style="cursor:pointer">Plus d'actions</summary>
+      ${wish || built ? "" : `<button class="btn sm full" style="margin-top:6px" data-d="addall">📦 J'ai les pièces : les ajouter et les réserver</button>`}
       ${miss ? `<button class="btn sm full" style="margin-top:6px" data-d="eq">🔁 Vérifier les pièces équivalentes</button><button class="btn sm full" style="margin-top:6px" data-d="csv">📥 Exporter les manquants (CSV)</button>` : ""}
-      ${s.parts.some(p => !p.n) ? `<button class="btn sm full" style="margin-top:6px" data-d="refresh">🔄 Mettre à jour l'inventaire (noms, autocollants)</button>` : ""}</details>` : ""}
-    <div class="seg" style="margin:12px 0 6px"><button data-sort="miss" class="${partSort === "miss" ? 'on' : ''}">Manquantes d'abord</button><button data-sort="done" class="${partSort === "done" ? 'on' : ''}">Complètes d'abord</button></div>
-    <button class="btn sm full ${onlyMiss ? "pri" : ""}" data-onlymiss="1" style="margin:0 0 6px">${onlyMiss ? "✓ " : ""}Manquantes uniquement (${nMiss})</button>
+      <button class="btn sm full" style="margin-top:6px" data-d="refresh">🔄 Mettre à jour l'inventaire (pièces, minifigs, autocollants)</button>
+      <button class="btn sm full" style="margin-top:6px" data-d="del">Retirer de la collection</button></details>`}
+    ${showTabs ? `<div class="seg" style="margin:12px 0 6px"><button data-tab="parts" class="${setTab === "parts" ? "on" : ""}">🧱 Pièces (${loose.length})</button><button data-tab="figs" class="${setTab === "figs" ? "on" : ""}">👤 Minifigs (${F ? nf : "…"})</button></div>` : '<div style="height:10px"></div>'}
+    ${setTab === "figs" ? figsHtml : `
+    <select id="psort" style="margin:0 0 8px"><option value="miss" ${!onlyMiss && partSort === "miss" ? "selected" : ""}>Manquantes d'abord</option><option value="done" ${!onlyMiss && partSort === "done" ? "selected" : ""}>Complètes d'abord</option><option value="only" ${onlyMiss ? "selected" : ""}>Manquantes uniquement (${nMiss})</option></select>
     ${onlyMiss && !shown.length ? '<div class="empty">Aucune pièce manquante 🎉</div>' : ""}
-    <div class="set-parts-grid">${shown.map(({ p, av, eq }) => `<div class="set-part-item" ${inModel ? "" : `data-p="${esc(p.k)}" style="cursor:pointer"`}>
-      <span class="badge-status ${av >= p.qty ? 'has' : (av > 0 ? 'missing' : '')}"${eq ? ' title="Complété avec une pièce équivalente (version unie ou imprimée)"' : ""}>${av}/${p.qty}${eq ? " ≈" : ""}</span>
-      ${pImg(p.part, p.color, p.i)}
-      <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
-      <div style="color:var(--text-muted); font-size:10px; margin-top:2px;">${esc(colName(p.color))}</div></div>`).join("")}</div>
+    <div class="set-parts-grid">${shown.map(({ p, av, eq }) => partTile(p, av, eq, !inModel)).join("")}</div>
     ${stick.length ? `<div class="sub" style="margin:14px 0 6px">🏷 Autocollants (${stick.reduce((n, p) => n + p.qty, 0)})${built ? " · déjà posés" : ""}</div>
     <div class="set-parts-grid">${stick.map(p => `<div class="set-part-item" data-stk="${esc(p.part)}" style="cursor:pointer" title="Voir sur Rebrickable"><span class="badge-status ${built ? 'has' : ''}">${built ? "✓" : "×" + p.qty}</span>
       <img src="${goodImg(p.i) ? esc(p.i) : STK_PH}" onerror="this.onerror=null;this.src=STK_PH" alt="" referrerpolicy="no-referrer">
       <div style="font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.part)}</div>
-      <div style="color:var(--text-muted); font-size:10px; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.n || "Autocollants")}</div></div>`).join("")}</div>` : ""}
-    ${s.tmp ? "" : `<button class="btn sm full" style="margin-top:14px" data-d="del">Retirer de la collection</button>`}`;
+      <div style="color:var(--text-muted); font-size:10px; margin-top:2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.n || "Autocollants")}</div></div>`).join("")}</div>` : ""}`}`;
 }
+$("modal-set").addEventListener("change", e => {
+  if (e.target.id !== "psort") return; const v = e.target.value;
+  onlyMiss = v === "only"; if (!onlyMiss) { partSort = v; LSset("brickstock-psort", partSort); } LSset("bs_onlymiss", onlyMiss ? "1" : "0"); renderDetail();
+});
 $("modal-set").onclick = e => {
   const ov = $("modal-set");
   if (e.target === ov) { ov.classList.remove("open"); renderCollection(); return; }
   const s = getSet(openNum); if (!s) return;
   const sk = e.target.closest("[data-stk]"); if (sk) { window.open("https://rebrickable.com/parts/" + encodeURIComponent(sk.dataset.stk) + "/", "_blank", "noopener"); return; }
+  const tb = e.target.closest("[data-tab]"); if (tb) { setTab = tb.dataset.tab; renderDetail(); return; }
+  const fo = e.target.closest("[data-fopen]"); if (fo && !e.target.closest("[data-p]")) { const i = +fo.dataset.fopen; figOpenI = figOpenI === i ? -1 : i; renderDetail(); return; }
   const om = e.target.closest("[data-onlymiss]");
   if (om) { onlyMiss = !onlyMiss; LSset("bs_onlymiss", onlyMiss ? "1" : "0"); renderDetail(); return; }
   const pt = e.target.closest("[data-p]");
@@ -3377,6 +3439,8 @@ async function openSetPreview(d) {
     if (!d.year || /^Set LEGO/.test(d.name || "")) { const j = await rb("sets/" + d.set_num + "/"); t.name = j.name || t.name; t.img = j.set_img_url || t.img; t.year = j.year || t.year; }
     const j = await rb("sets/" + d.set_num + "/parts/?page_size=1000");
     t.parts = invParts(j); t.msg = t.parts.length ? "" : "Aucune pièce trouvée pour ce set.";
+    if (setTmp === t && openNum === t.num) renderDetail();
+    try { const F = await setFigsOf(d.set_num); t.figs = F; t.parts = withFigs(t.parts, F); t.fv = 1; } catch (e) { t.figs = []; }
   } catch (e) { t.msg = "Erreur : " + e.message; }
   if (setTmp === t && openNum === t.num) renderDetail();
 }
@@ -3388,7 +3452,7 @@ async function searchSet() { // numéro saisi : ouvre directement la fiche (sans
 function addTmpSet(t, wish) {
   if (!t.parts.length) return showToast("Inventaire non chargé (clé Rebrickable requise)");
   if (findSet(t.num)) return;
-  setsCol.push({ num: t.num, name: t.name, img: t.img, year: t.year || "", manual: null, added: false, reserved: false, wish: !!wish, parts: t.parts });
+  setsCol.push({ num: t.num, name: t.name, img: t.img, year: t.year || "", manual: null, added: false, reserved: false, wish: !!wish, parts: t.parts, ...(t.fv ? { figs: t.figs, fv: 1 } : {}) });
   setTmp = null; saveSets(); renderCollection(); renderDetail(); renderSugg();
   showToast(wish ? "Ajouté à tes envies ⭐" : "Ajouté à ta collection ✓");
 }
@@ -4052,7 +4116,13 @@ window.bkDedupe = function () {
     + ".sg-card img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#fff;border-radius:8px}"
     + ".sg-card .sg-n{font-size:13px;font-weight:700;margin-top:6px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}"
     + ".sg-card .sub{font-size:11px;margin-top:2px}.sg-badge{position:absolute;top:10px;left:10px;background:var(--success);color:#fff;border-radius:10px;padding:2px 7px;font-size:10px;font-weight:800}"
-    + ".sg-old{display:block;text-align:center;font-size:12px;padding:6px 10px 10px;color:var(--text-muted)}</style>");
+    + ".sg-old{display:block;text-align:center;font-size:12px;padding:6px 10px 10px;color:var(--text-muted)}"
+    + ".set-links{display:flex;gap:6px;margin-top:10px}.set-links .btn{flex:1;text-align:center;justify-content:center}"
+    + ".fig-in-set{padding:8px}.fig-in-set .set-header img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:8px}</style>");
+  /* tes sets déjà enregistrés : ajoute en arrière-plan les pièces de leurs minifigs, un set à la fois */
+  setTimeout(async function () {
+    for (var i = 0; i < setsCol.length; i++) { var s = setsCol[i]; if (s.fv || !rbKey) continue; await loadSetFigs(s); await sleep(1500); }
+  }, 4000);
   (function () { var y = $("ymin-in"); if (!y) return; y.value = +LS("bs_ymin") || 2009;
     y.onchange = function () { var v = parseInt(y.value, 10); if (!(v >= 1949 && v <= 2030)) v = 2009; y.value = v; LSset("bs_ymin", String(v)); showToast("Sets à partir de " + v); }; })();
   var load = function (k, d) { try { var v = JSON.parse(localStorage.getItem(k) || "null"); return v && typeof v === "object" ? v : d; } catch (e) { return d; } };
