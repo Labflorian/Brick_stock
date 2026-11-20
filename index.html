@@ -670,8 +670,8 @@ video {
 .cand-col .sw { width: 14px; height: 14px; }
 img.generic { filter: grayscale(1); opacity: .7; }
 .scan-bottom { gap: 10px; padding-top: 4px; }
-.scan-bottom #snap { flex: 1; font-size: 17px; padding: 16px 12px; border-radius: 16px; }
-.scan-bottom .color-badge-btn { padding: 16px 12px; }
+.scan-bottom #snap { flex: 1; font-size: 15px; padding: 11px 12px; border-radius: 14px; }
+.scan-bottom .color-badge-btn { padding: 11px 12px; }
 .set-card.clk { cursor: pointer; }
 .seg { display: flex; gap: 6px; margin: 8px 0; }
 .seg button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text-main); font-size: 12px; font-weight: 600; cursor: pointer; }
@@ -4149,17 +4149,18 @@ window.bkDedupe = function () {
     + ".set-links{display:flex;gap:6px;margin-top:10px}.set-links .btn{flex:1;text-align:center;justify-content:center}"
     + ".fig-in-set{padding:8px}.fig-in-set .set-header img{width:56px;height:56px;object-fit:contain;background:#fff;border-radius:8px}</style>");
   /* Scan : choix Pièce / Minifig (une minifig n'a pas de couleur à choisir) */
-  document.head.insertAdjacentHTML("beforeend", "<style>#scan-kind{margin:0 0 8px}body.scan-fig #open-color-picker,body.scan-fig #scan-opts,body.scan-fig #scan-calib,body.scan-fig #raf-lock,body.scan-fig #raf-btn,body.scan-fig #basket,body.scan-fig #s-scan .scan-results-container,body.scan-fig #vis-reset{display:none!important}body.scan-fig .color-target-spot{display:none}#modal-figscan.from-scan .fsv-box,#modal-figscan.from-scan #fs-snap,#modal-figscan.from-scan #fs-file{display:none}</style>");
-  $("vw-box").insertAdjacentHTML("beforebegin", '<div class="seg" id="scan-kind"><button data-k="part">🧱 Pièce</button><button data-k="fig">👤 Minifig</button></div>');
+  document.head.insertAdjacentHTML("beforeend", "<style>#scan-kind{flex:none;margin-left:auto}body.scan-fig #scan-opts label,body.scan-fig #open-color-picker,body.scan-fig #scan-calib,body.scan-fig #raf-lock,body.scan-fig #raf-btn,body.scan-fig #basket,body.scan-fig #s-scan .scan-results-container,body.scan-fig #vis-reset{display:none!important}body.scan-fig .color-target-spot{display:none}#modal-figscan.from-scan .fsv-box,#modal-figscan.from-scan #fs-snap,#modal-figscan.from-scan #fs-file{display:none}</style>");
+  /* un seul bouton qui alterne, à droite de « Couleur auto de la pièce » */
+  $("scan-opts").insertAdjacentHTML("beforeend", '<button class="btn sm" id="scan-kind" type="button"></button>');
   var scanKind = LS("bs_scankind") === "fig" ? "fig" : "part", snapTxt = $("snap").textContent;
   function applyKind() {
     document.body.classList.toggle("scan-fig", scanKind === "fig");
-    $("scan-kind").querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", b.dataset.k === scanKind); });
+    $("scan-kind").textContent = scanKind === "fig" ? "🧱 Mode pièce" : "👤 Mode minifig";
     $("snap").textContent = scanKind === "fig" ? "📷 Scanner la minifig" : snapTxt;
     if (scanKind === "fig" && $("auto").checked) { $("auto").checked = false; clearInterval(timer); timer = null; }
     st(scanKind === "fig" ? "Place la minifig entière dans le cadre et touche « Scanner la minifig »" : "Placez la pièce dans le cadrage et touchez \"Scanner\"");
   }
-  $("scan-kind").onclick = function (e) { var b = e.target.closest("button[data-k]"); if (!b) return; scanKind = b.dataset.k; LSset("bs_scankind", scanKind); applyKind(); triggerHaptic(); };
+  $("scan-kind").onclick = function () { scanKind = scanKind === "fig" ? "part" : "fig"; LSset("bs_scankind", scanKind); applyKind(); triggerHaptic(); };
   async function scanFig() {
     if (fsBusy) return;
     if (!stream || !v.videoWidth) { var ok = await startCam(); if (!ok) return; await sleep(600); }
@@ -4184,7 +4185,7 @@ window.bkDedupe = function () {
     + ".stk-menu{position:relative;flex:none}.stk-pop{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:230px;padding:8px;border-radius:12px;background:var(--card-bg);border:1px solid var(--card-border);box-shadow:0 10px 30px rgba(0,0,0,.35);flex-direction:column;gap:6px}.stk-pop.open{display:flex}.stk-pop .btn{width:100%}"
     + "body.stk-c2 #list.sgrid{grid-template-columns:repeat(2,1fr)}body.stk-c3 #list.sgrid{grid-template-columns:repeat(3,1fr)}"
     + "#coll-cat{margin:8px 0}"
-    + "@media (min-width:900px){#s-scan.on{grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto}#s-scan #scan-kind{grid-column:1;grid-row:1}#s-scan .vw-container,body.raf-on #s-scan .vw-container{grid-row:2}#s-scan .scan-quick{grid-row:3}#s-scan #scan-opts{grid-row:4}#s-scan #scan-calib{grid-column:1;grid-row:5}#s-scan .scan-toolbar{grid-row:7}#s-scan .basket,#s-scan .scan-results-container{grid-row:1 / 8}}"
+    + "@media (min-width:900px){#s-scan.on{grid-template-rows:auto auto auto auto minmax(0,1fr) auto}#s-scan .vw-container,body.raf-on #s-scan .vw-container{grid-row:1}#s-scan .scan-quick{grid-row:2}#s-scan #scan-opts{grid-row:3}#s-scan #scan-calib{grid-column:1;grid-row:4}#s-scan .scan-toolbar{grid-row:6}#s-scan .basket,#s-scan .scan-results-container{grid-row:1 / 7}}"
     + "</style>");
   (function scanTweaks() {
     /* « Auto (2,5 s) » rangé dans ⚙️ Paramètres (le reste de l'onglet Scanner est comme avant) */
