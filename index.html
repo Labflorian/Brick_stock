@@ -4285,6 +4285,7 @@ window.bkDedupe = function () {
   window.smartPick = async function (cands, col, mode, sug) {
     var out = { cands: cands.map(function (c) { return Object.assign({}, c); }), col: col, flag: "", sug: (sug || []).slice() };
     if (!rbKey || !out.cands.length) return out;
+    var cEarly = partColors(out.cands[0].part);   /* en parallèle : gagne un aller-retour réseau */
     await timeout(partInfos(out.cands.map(function (c) { return c.part; })), 3500);
     /* 1. numéro prouvé identique à une pièce de mes sets : on prend le numéro du set */
     var R = setRefs();
@@ -4302,7 +4303,7 @@ window.bkDedupe = function () {
       if (alt) { out.cands = [alt].concat(out.cands.filter(function (c) { return c !== alt; })); top = alt; }
     }
     /* 3. couleur : seulement celles qui existent pour cette pièce */
-    var C = await timeout(partColors(top.alias || top.part), 3000);
+    var C = await timeout((top.alias || top.part) === cands[0].part ? cEarly : partColors(top.alias || top.part), 3000);
     if (C && C.length && top.alias) { var C2 = await timeout(partColors(top.part), 2500); if (C2 && C2.length) C = Array.from(new Set(C2.concat(C))); }
     if (top.old) out.flag = "old";
     if (!C || !C.length) return out;
@@ -4328,16 +4329,30 @@ window.bkDedupe = function () {
   var FLAG = { uniq: "🎨 Couleur unique pour cette pièce", nocol: "⚠ N'existe pas dans cette couleur : vérifie", old: "⚠ Pièce ancienne (avant " + yMin() + ") : vérifie" };
   window.scanFlagText = function (f) { return f === "old" ? "⚠ Pièce ancienne (sets d'avant " + yMin() + " ou aucun set) : vérifie" : (FLAG[f] || ""); };
 
-  /* Rafale */
+  /* Rafale : la pièce s'affiche tout de suite, puis elle est corrigée dès que Rebrickable a répondu (quelques dixièmes de seconde) */
   var _ba = basketAdd;
-  basketAdd = async function (c, col, th, sug) {
-    if (!c || !c.length) return _ba(c, col, th, sug);
-    var mode = modeNow(), r;
-    st("Vérification de la pièce…");
-    try { r = await smartPick(c, col, mode, sug || []); } catch (e) { r = { cands: c, col: col, sug: sug, flag: "" }; }
-    _ba(r.cands, r.col, th, r.sug);
-    var top = r.cands[0], b = basket.find(function (x) { return x.color === r.col && (x.part === top.part || x.alias === top.part || canonPart(x.part) === canonPart(top.part)); });
-    if (b) { if (top.alias && !b.alias) b.alias = top.alias; b.flag = r.flag || ""; b.sug = r.sug; bkSave(); renderBasket(); }
+  var sameRow = function (top, col) { return basket.find(function (x) { return x.color === col && (x.part === top.part || x.alias === top.part || canonPart(x.part) === canonPart(top.part)); }); };
+  basketAdd = function (c, col, th, sug) {
+    if (!c || !c.length || !rbKey) return _ba(c, col, th, sug);
+    var mode = modeNow(), top0 = c[0], wasNew = !sameRow(top0, col);
+    _ba(c, col, th, sug);
+    var b0 = sameRow(top0, col); if (!b0) return;
+    var id = b0.id, col0 = b0.color;
+    smartPick(c, col, mode, sug || []).then(function (r) {
+      var b = basket.find(function (x) { return x.id === id; });
+      if (!b || b.color !== col0) return;                       /* ligne retirée ou couleur changée à la main entre-temps */
+      var t = r.cands[0], movePart = t.part !== top0.part && canonPart(b.part) !== canonPart(t.part) || t.inSet && b.part !== t.part;
+      if (r.col === b.color && !movePart) { b.flag = r.flag || ""; b.sug = r.sug; if (t.alias && !b.alias) b.alias = t.alias; bkSave(); renderBasket(); return; }
+      if (wasNew) {                                              /* ligne créée par ce scan : on la corrige sur place */
+        b.part = t.part; b.name = t.name; b.img = t.img; b.score = t.score; if (t.alias) b.alias = t.alias;
+        b.alts = r.cands.slice(1); b.color = r.col; b.sug = r.sug; b.flag = r.flag || ""; bkMerge(b);
+        var m = basket.find(function (x) { return x.id === id; }) || sameRow(t, r.col); if (m) m.flag = r.flag || "";
+      } else {                                                   /* scan ajouté à une ligne existante : on déplace ce +1 */
+        b.qty--; if (b.qty <= 0) basket = basket.filter(function (x) { return x !== b; });
+        _ba(r.cands, r.col, th, r.sug); var n = sameRow(t, r.col); if (n) n.flag = r.flag || "";
+      }
+      bkSave(); renderBasket();
+    }).catch(function () {});
   };
   var _rbk = renderBasket;
   renderBasket = function () {
@@ -4350,19 +4365,21 @@ window.bkDedupe = function () {
   /* une couleur choisie à la main sur la ligne efface l'avertissement */
   document.addEventListener("click", function (e) { var sw = e.target.closest && e.target.closest(".bk-item .quick-swatch[data-cid]"); if (!sw) return; var row = sw.closest(".bk-item"), b = row && basket.find(function (x) { return String(x.id) === row.dataset.id; }); if (b) b.flag = ""; }, true);
 
-  /* Mode normal (sans rafale) */
+  /* Mode normal (sans rafale) : propositions affichées tout de suite, puis corrigées dès que Rebrickable a répondu */
   var _show = show;
-  show = async function (items) {
-    if (!items || !items.length || !rbKey) return _show(items);
-    var c = items.map(function (it) { return { part: rbNum(it), name: it.name, img: it.img_url, score: it.score }; }), r;
-    st("Vérification de la pièce…");
-    try { r = await smartPick(c, curCol, modeNow(), suggested.slice()); } catch (e) { return _show(items); }
-    var curCol0 = curCol;
-    if (r.col !== curCol && r.col != null) updateSelectedColor(r.col);
-    suggested = r.sug;
-    if (r.col !== 9999 && (r.flag || r.col !== curCol0)) colorNote = colName(r.col) + (r.flag ? " · " + scanFlagText(r.flag) : "");
-    else if (r.flag) colorNote = (colorNote ? colorNote + " · " : "") + scanFlagText(r.flag);
-    _show(r.cands.map(function (x) { return { id: x.part, name: x.name + (x.old ? " (ancienne)" : ""), img_url: x.img, score: x.score }; }));
+  show = function (items) {
+    _show(items);
+    if (!items || !items.length || !rbKey) return;
+    var arr = cand, col0 = curCol, note0 = colorNote, c = arr.map(function (x) { return { part: x.part, name: x.name, img: x.img, score: x.score }; });
+    smartPick(c, curCol, modeNow(), suggested.slice()).then(function (r) {
+      if (cand !== arr || curCol !== col0) return;               /* nouveau scan ou couleur choisie à la main entre-temps */
+      if (r.col !== curCol && r.col != null) updateSelectedColor(r.col);
+      suggested = r.sug;
+      colorNote = r.col !== 9999 && (r.flag || r.col !== col0) ? colName(r.col) + (r.flag ? " · " + scanFlagText(r.flag) : "") : (r.flag ? (note0 ? note0 + " · " : "") + scanFlagText(r.flag) : note0);
+      cand = r.cands.map(function (x) { return { part: x.part, name: x.name + (x.old ? " (ancienne)" : ""), img: x.img, score: x.score }; });
+      st((colorNote ? "Couleur : " + colorNote + " · " : "") + "Choisissez la bonne pièce :");
+      renderRes();
+    }).catch(function () {});
   };
 })();
 </script>
