@@ -2853,7 +2853,7 @@ try { themes = JSON.parse(localStorage.getItem("brickstock-themes") || "null"); 
 const saveFigs = () => { tStamp = Date.now(); LSset("bs_t", String(tStamp)); LSset("brickstock-figs", JSON.stringify(figs)); push(); };
 async function rb(path) {
   const u = "https://rebrickable.com/api/v3/lego/" + path + (path.includes("?") ? "&" : "?") + "key=" + rbKey;
-  let r = await fetch(u); if (r.status === 429) { await sleep(2500); r = await fetch(u); }
+  let r = await fetch(u); for (let k = 0; r.status === 429 && k < 3; k++) { await sleep(1100); r = await fetch(u); }
   if (!r.ok) throw new Error("HTTP " + r.status); return r.json();
 }
 async function loadThemes() {
@@ -3848,7 +3848,12 @@ window.bkDedupe = function () {
     if (id in MAP) return Promise.resolve(MAP[id]);
     if (!rbKey) return Promise.resolve(null);
     if (pend[id]) return pend[id];
-    return pend[id] = rb("parts/?bricklink_id=" + encodeURIComponent(id) + "&page_size=5").then(function (j) {
+    return pend[id] = Promise.resolve(window.__scanInfos).catch(function () {}).then(function () {
+      var pi0 = window.__PI && window.__PI[id]; return pi0 || !window.partInfos ? null : partInfos([id], 1).catch(function () {});
+    }).then(function () {
+      var pi = window.__PI && window.__PI[id]; if (pi && !pi.nf) { MAP[id] = null; localStorage.setItem("bs_rbmap", JSON.stringify(MAP)); return { results: [] }; }
+      return rb("parts/?bricklink_id=" + encodeURIComponent(id) + "&page_size=5", 1);
+    }).then(function (j) {
       var r = (j.results || []), v = null;
       if (r.length === 1 && r[0].part_num !== id) v = { part: r[0].part_num, name: r[0].name };
       MAP[id] = v; localStorage.setItem("bs_rbmap", JSON.stringify(MAP)); return v;
@@ -4219,42 +4224,60 @@ window.bkDedupe = function () {
   }, 4000);
   (function () { var y = $("ymin-in"); if (!y) return; y.value = +LS("bs_ymin") || 2009;
     y.onchange = function () { var v = parseInt(y.value, 10); if (!(v >= 1949 && v <= 2030)) v = 2009; y.value = v; LSset("bs_ymin", String(v)); showToast("Sets à partir de " + v); }; })();
+  /* File d'attente Rebrickable : une requête à la fois (Rebrickable freine et impose une pause si on en envoie plusieurs d'un coup),
+     les vérifications du scan passent devant tout le reste */
+  (function () {
+    var raw = rb, q = [], running = false, last = 0;
+    rb = function (path, hi) { return new Promise(function (res, rej) { var j = { path: path, res: res, rej: rej, hi: hi ? 1 : 0 }; if (j.hi) { var i = q.findIndex(function (x) { return !x.hi; }); q.splice(i < 0 ? q.length : i, 0, j); } else q.push(j); pump(); }); };
+    async function pump() {
+      if (running) return; running = true;
+      while (q.length) { var j = q.shift(), w = last + 250 - Date.now(); if (w > 0) await sleep(w); last = Date.now(); try { j.res(await raw(j.path)); } catch (e) { j.rej(e); } }
+      running = false;
+    }
+  })();
   var load = function (k, d) { try { var v = JSON.parse(localStorage.getItem(k) || "null"); return v && typeof v === "object" ? v : d; } catch (e) { return d; } };
   var PI = load("bs_pinfo", {}), PC = load("bs_pcols", {});
-  var savePI = function () { try { localStorage.setItem("bs_pinfo", JSON.stringify(PI)); } catch (e) {} };
-  var savePC = function () { try { localStorage.setItem("bs_pcols", JSON.stringify(PC)); } catch (e) {} };
+  /* si la mémoire du navigateur est pleine, on sacrifie d'abord la mémoire des suggestions (elle se refait toute seule) */
+  var saveKey = function (k, o) { try { localStorage.setItem(k, JSON.stringify(o)); } catch (e) { try { localStorage.removeItem("bs_sugc"); localStorage.setItem(k, JSON.stringify(o)); } catch (e2) {} } };
+  var savePI = function () { saveKey("bs_pinfo", PI); };
+  var savePC = function () { saveKey("bs_pcols", PC); };
+  window.__PI = PI;
   window.yMin = function () { return +LS("bs_ymin") || 2009; };
   var timeout = function (p, ms) { return Promise.race([p, new Promise(function (r) { setTimeout(function () { r(null); }, ms); })]); };
 
   /* Fiche Rebrickable des pièces (années + numéros prouvés identiques), un seul appel pour plusieurs pièces, mémorisée */
   var piPend = null;
-  window.partInfos = async function (parts) {
+  async function fetchInfos(todo, hi) {
+    var j = await rb("parts/?part_nums=" + todo.map(encodeURIComponent).join(",") + "&inc_part_details=1&page_size=100", hi);
+    var got = {}, eqChanged = false;
+    (j.results || []).forEach(function (x) {
+      var L = (x.alternates || []).concat(x.molds || [], x.print_of ? [x.print_of] : []), ex = x.external_ids || {};
+      ["BrickLink", "LDraw"].forEach(function (k) { (ex[k] || []).forEach(function (id) { id = String(id); if (id && id !== x.part_num) L.push(id); }); });
+      L = Array.from(new Set(L));
+      PI[x.part_num] = { y0: +x.year_from || 0, y1: +x.year_to || 0, t: Date.now() }; got[x.part_num] = 1;
+      if (!(x.part_num in EQC) || L.some(function (p) { return EQC[x.part_num].indexOf(p) < 0; })) { EQC[x.part_num] = Array.from(new Set((EQC[x.part_num] || []).concat(L))); eqChanged = true; }
+    });
+    todo.forEach(function (p) { if (!got[p]) PI[p] = { nf: 1, t: Date.now() }; });
+    savePI();
+    if (eqChanged) { LSset("brickstock-equiv", JSON.stringify(EQC)); buildEq(); _T = null; }
+  }
+  window.partInfos = async function (parts, hi) {
     if (!rbKey) return;
     var todo = Array.from(new Set(parts.filter(Boolean))).filter(function (p) { return !PI[p]; }).slice(0, 40);
     if (!todo.length) return;
+    if (hi) { try { await fetchInfos(todo, 1); } catch (e) {} return; }   /* scan : n'attend pas le préchargement en cours */
     while (piPend) { try { await piPend; } catch (e) {} todo = todo.filter(function (p) { return !PI[p]; }); if (!todo.length) return; }
-    piPend = (async function () {
-      var j = await rb("parts/?part_nums=" + todo.map(encodeURIComponent).join(",") + "&inc_part_details=1&page_size=100");
-      var got = {}, eqChanged = false;
-      (j.results || []).forEach(function (x) {
-        var L = (x.alternates || []).concat(x.molds || [], x.print_of ? [x.print_of] : []), ex = x.external_ids || {};
-        ["BrickLink", "LDraw"].forEach(function (k) { (ex[k] || []).forEach(function (id) { id = String(id); if (id && id !== x.part_num) L.push(id); }); });
-        L = Array.from(new Set(L));
-        PI[x.part_num] = { y0: +x.year_from || 0, y1: +x.year_to || 0, t: Date.now() }; got[x.part_num] = 1;
-        if (!(x.part_num in EQC) || L.some(function (p) { return EQC[x.part_num].indexOf(p) < 0; })) { EQC[x.part_num] = Array.from(new Set((EQC[x.part_num] || []).concat(L))); eqChanged = true; }
-      });
-      todo.forEach(function (p) { if (!got[p]) PI[p] = { nf: 1, t: Date.now() }; });
-      savePI();
-      if (eqChanged) { LSset("brickstock-equiv", JSON.stringify(EQC)); buildEq(); _T = null; }
-    })();
+    piPend = fetchInfos(todo, 0);
     try { await piPend; } catch (e) {} finally { piPend = null; }
   };
   /* Couleurs dans lesquelles la pièce existe vraiment (mémorisées) */
-  window.partColors = async function (p) {
+  var pcPend = {};
+  window.partColors = async function (p, hi) {
     if (PC[p] && Date.now() - (PC[p].t || 0) < 60 * 864e5) return PC[p].c;
     if (!rbKey) return null;
-    try { var j = await rb("parts/" + encodeURIComponent(p) + "/colors/?page_size=300"); PC[p] = { c: (j.results || []).map(function (x) { return x.color_id; }).filter(function (c) { return c !== 9999 && c !== -1; }), t: Date.now() }; savePC(); return PC[p].c; }
-    catch (e) { return null; }
+    if (pcPend[p]) return pcPend[p];
+    return pcPend[p] = rb("parts/" + encodeURIComponent(p) + "/colors/?page_size=300", hi).then(function (j) { PC[p] = { c: (j.results || []).map(function (x) { return x.color_id; }).filter(function (c) { return c !== 9999 && c !== -1; }), t: Date.now() }; savePC(); return PC[p].c; })
+      .catch(function () { return null; }).then(function (v) { delete pcPend[p]; return v; });
   };
   /* Pièce ancienne : utilisée seulement avant l'année limite, ou dans aucun set connu */
   window.partOld = function (p) {
@@ -4293,8 +4316,9 @@ window.bkDedupe = function () {
   window.smartPick = async function (cands, col, mode, sug) {
     var out = { cands: cands.map(function (c) { return Object.assign({}, c); }), col: col, flag: "", sug: (sug || []).slice() };
     if (!rbKey || !out.cands.length) return out;
-    var cEarly = partColors(out.cands[0].part);   /* en parallèle : gagne un aller-retour réseau */
-    await timeout(partInfos(out.cands.map(function (c) { return c.part; })), 3500);
+    var cEarly = partColors(out.cands[0].part, 1), infosP = partInfos(out.cands.map(function (c) { return c.part; }), 1);
+    window.__scanInfos = infosP;
+    await timeout(infosP, 3500);
     /* 1. numéro prouvé identique à une pièce de mes sets : on prend le numéro du set */
     var R = setRefs();
     out.cands.forEach(function (c) {
@@ -4305,14 +4329,14 @@ window.bkDedupe = function () {
     /* 2. la proposition en tête est ancienne : une proposition récente presque aussi sûre passe devant */
     var top = out.cands[0], sc = function (c) { return typeof c.score === "number" ? c.score : 0; };
     var pi0 = PI[top.alias || top.part];
-    if (!top.inSet && pi0 && !pi0.nf && !pi0.y1) { await timeout(partColors(top.alias || top.part), 2500); top.old = partOld(top.alias || top.part); }
+    if (!top.inSet && pi0 && !pi0.nf && !pi0.y1) { await timeout((top.alias || top.part) === cands[0].part ? cEarly : partColors(top.alias || top.part, 1), 2500); top.old = partOld(top.alias || top.part); }
     if (top.old) {
       var alt = out.cands.slice(1).find(function (c) { return !c.old && (canonPart(c.part) === canonPart(top.part) || sc(c) >= 0.6 * sc(top)); });
       if (alt) { out.cands = [alt].concat(out.cands.filter(function (c) { return c !== alt; })); top = alt; }
     }
     /* 3. couleur : seulement celles qui existent pour cette pièce */
-    var C = await timeout((top.alias || top.part) === cands[0].part ? cEarly : partColors(top.alias || top.part), 3000);
-    if (C && C.length && top.alias) { var C2 = await timeout(partColors(top.part), 2500); if (C2 && C2.length) C = Array.from(new Set(C2.concat(C))); }
+    var C = await timeout((top.alias || top.part) === cands[0].part ? cEarly : partColors(top.alias || top.part, 1), 3000);
+    if (C && C.length && top.alias) { var C2 = await timeout(partColors(top.part, 1), 2500); if (C2 && C2.length) C = Array.from(new Set(C2.concat(C))); }
     if (top.old) out.flag = "old";
     if (!C || !C.length) return out;
     var r0 = R[canonPart(top.part)], has = function (c) { return C.indexOf(+c) >= 0; };
@@ -4336,14 +4360,14 @@ window.bkDedupe = function () {
   /* Préchargement discret : fiches et couleurs des pièces de ton stock et de tes sets, pour que le scan les trouve déjà en mémoire.
      Une requête toutes les 1,2 s, mise en pause pendant que tu scannes (le scan reste prioritaire auprès de Rebrickable). */
   setTimeout(async function warm() {
-    var busyScan = function () { return Date.now() - (window.__lastScanT || 0) < 10000 || document.hidden; };
+    var busyScan = function () { return Date.now() - (window.__lastScanT || 0) < 3000 || document.hidden; };
     var list = []; stock.forEach(function (x) { list.push(x.part); }); setsCol.forEach(function (s) { (s.parts || []).forEach(function (p) { if (!p.st) list.push(p.part); }); });
     list = Array.from(new Set(list));
     var noInfo = list.filter(function (p) { return !PI[p]; });
     for (var i = 0; i < noInfo.length && rbKey; i += 40) { while (busyScan()) await sleep(3000); try { await partInfos(noInfo.slice(i, i + 40)); } catch (e) {} await sleep(1200); }
     var noCol = list.filter(function (p) { return !(PC[p] && Date.now() - (PC[p].t || 0) < 60 * 864e5) && !(PI[p] && PI[p].nf); });
-    for (var j = 0; j < noCol.length && rbKey; j++) { while (busyScan()) await sleep(3000); await partColors(noCol[j]); await sleep(1200); }
-  }, 15000);
+    for (var j = 0; j < noCol.length && rbKey; j++) { while (busyScan()) await sleep(1500); await partColors(noCol[j]); await sleep(1200); }
+  }, 5000);
   var modeNow = function () { return (window.rafOn && window.rafLock) ? "lock" : ($("autocol").checked ? "auto" : "manual"); };
   var FLAG = { uniq: "🎨 Couleur unique pour cette pièce", nocol: "⚠ N'existe pas dans cette couleur : vérifie", old: "⚠ Pièce ancienne (avant " + yMin() + ") : vérifie" };
   window.scanFlagText = function (f) { return f === "old" ? "⚠ Pièce ancienne (sets d'avant " + yMin() + " ou aucun set) : vérifie" : (FLAG[f] || ""); };
@@ -4354,12 +4378,13 @@ window.bkDedupe = function () {
   basketAdd = function (c, col, th, sug) {
     if (!c || !c.length || !rbKey) return _ba(c, col, th, sug);
     var mode = modeNow(), top0 = c[0], wasNew = !sameRow(top0, col);
+    var pick = smartPick(c, col, mode, sug || []);
     _ba(c, col, th, sug);
     var b0 = sameRow(top0, col); if (!b0) return;
     var id = b0.id, col0 = b0.color;
     window.__lastScanT = Date.now(); b0.chk = 1; renderBasket();
     var done = function () { var x = basket.find(function (y) { return y.id === id; }); if (x && x.chk) { x.chk = 0; renderBasket(); } };
-    smartPick(c, col, mode, sug || []).then(function (r) {
+    pick.then(function (r) {
       var b = basket.find(function (x) { return x.id === id; });
       if (b) b.chk = 0;
       if (!b || b.color !== col0) return done();                       /* ligne retirée ou couleur changée à la main entre-temps */
@@ -4391,11 +4416,13 @@ window.bkDedupe = function () {
   /* Mode normal (sans rafale) : propositions affichées tout de suite, puis corrigées dès que Rebrickable a répondu */
   var _show = show;
   show = function (items) {
+    if (!items || !items.length || !rbKey) return _show(items);
+    var c = items.map(function (it) { return { part: rbNum(it), name: it.name, img: it.img_url, score: it.score }; });
+    var pick = smartPick(c, curCol, modeNow(), suggested.slice());
     _show(items);
-    if (!items || !items.length || !rbKey) return;
-    var arr = cand, col0 = curCol, note0 = colorNote, c = arr.map(function (x) { return { part: x.part, name: x.name, img: x.img, score: x.score }; });
+    var arr = cand, col0 = curCol, note0 = colorNote;
     window.__lastScanT = Date.now();
-    smartPick(c, curCol, modeNow(), suggested.slice()).then(function (r) {
+    pick.then(function (r) {
       if (cand !== arr || curCol !== col0) return;               /* nouveau scan ou couleur choisie à la main entre-temps */
       if (r.col !== curCol && r.col != null) updateSelectedColor(r.col);
       suggested = r.sug;
