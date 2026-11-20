@@ -4133,7 +4133,7 @@ window.bkDedupe = function () {
 <script>
 /* ===== BrickStock v5 : scan intelligent — couleurs existantes, numéros prouvés identiques, pièces anciennes (année limite) ===== */
 (function () {
-  document.head.insertAdjacentHTML("beforeend", "<style>.bk-flag{font-size:11px;font-weight:700;color:var(--warning);margin-top:2px}.bk-flag.ok{color:var(--success)}"
+  document.head.insertAdjacentHTML("beforeend", "<style>.bk-flag{font-size:11px;font-weight:700;color:var(--warning);margin-top:2px}.bk-flag.ok{color:var(--success)}.bk-chk{font-size:11px;color:var(--text-muted);margin-top:2px}"
     + ".sg-tools{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px 0}"
     + ".sg-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:8px}@media(min-width:600px){.sg-grid{grid-template-columns:repeat(3,1fr)}}@media(min-width:900px){.sg-grid{grid-template-columns:repeat(4,1fr)}}"
     + ".sg-card{position:relative;border:1px solid var(--card-border);border-radius:var(--radius-md,12px);padding:6px;cursor:pointer;background:var(--card-bg)}"
@@ -4215,7 +4215,7 @@ window.bkDedupe = function () {
 
   /* tes sets déjà enregistrés : ajoute en arrière-plan les pièces de leurs minifigs, un set à la fois */
   setTimeout(async function () {
-    for (var i = 0; i < setsCol.length; i++) { var s = setsCol[i]; if (s.fv || !rbKey) continue; await loadSetFigs(s); await sleep(1500); }
+    for (var i = 0; i < setsCol.length; i++) { var s = setsCol[i]; if (s.fv || !rbKey) continue; while (Date.now() - (window.__lastScanT || 0) < 10000) await sleep(3000); await loadSetFigs(s); await sleep(1500); }
   }, 4000);
   (function () { var y = $("ymin-in"); if (!y) return; y.value = +LS("bs_ymin") || 2009;
     y.onchange = function () { var v = parseInt(y.value, 10); if (!(v >= 1949 && v <= 2030)) v = 2009; y.value = v; LSset("bs_ymin", String(v)); showToast("Sets à partir de " + v); }; })();
@@ -4325,6 +4325,17 @@ window.bkDedupe = function () {
     out.C = C;
     return out;
   };
+  /* Préchargement discret : fiches et couleurs des pièces de ton stock et de tes sets, pour que le scan les trouve déjà en mémoire.
+     Une requête toutes les 1,2 s, mise en pause pendant que tu scannes (le scan reste prioritaire auprès de Rebrickable). */
+  setTimeout(async function warm() {
+    var busyScan = function () { return Date.now() - (window.__lastScanT || 0) < 10000 || document.hidden; };
+    var list = []; stock.forEach(function (x) { list.push(x.part); }); setsCol.forEach(function (s) { (s.parts || []).forEach(function (p) { if (!p.st) list.push(p.part); }); });
+    list = Array.from(new Set(list));
+    var noInfo = list.filter(function (p) { return !PI[p]; });
+    for (var i = 0; i < noInfo.length && rbKey; i += 40) { while (busyScan()) await sleep(3000); try { await partInfos(noInfo.slice(i, i + 40)); } catch (e) {} await sleep(1200); }
+    var noCol = list.filter(function (p) { return !(PC[p] && Date.now() - (PC[p].t || 0) < 60 * 864e5) && !(PI[p] && PI[p].nf); });
+    for (var j = 0; j < noCol.length && rbKey; j++) { while (busyScan()) await sleep(3000); await partColors(noCol[j]); await sleep(1200); }
+  }, 15000);
   var modeNow = function () { return (window.rafOn && window.rafLock) ? "lock" : ($("autocol").checked ? "auto" : "manual"); };
   var FLAG = { uniq: "🎨 Couleur unique pour cette pièce", nocol: "⚠ N'existe pas dans cette couleur : vérifie", old: "⚠ Pièce ancienne (avant " + yMin() + ") : vérifie" };
   window.scanFlagText = function (f) { return f === "old" ? "⚠ Pièce ancienne (sets d'avant " + yMin() + " ou aucun set) : vérifie" : (FLAG[f] || ""); };
@@ -4338,9 +4349,12 @@ window.bkDedupe = function () {
     _ba(c, col, th, sug);
     var b0 = sameRow(top0, col); if (!b0) return;
     var id = b0.id, col0 = b0.color;
+    window.__lastScanT = Date.now(); b0.chk = 1; renderBasket();
+    var done = function () { var x = basket.find(function (y) { return y.id === id; }); if (x && x.chk) { x.chk = 0; renderBasket(); } };
     smartPick(c, col, mode, sug || []).then(function (r) {
       var b = basket.find(function (x) { return x.id === id; });
-      if (!b || b.color !== col0) return;                       /* ligne retirée ou couleur changée à la main entre-temps */
+      if (b) b.chk = 0;
+      if (!b || b.color !== col0) return done();                       /* ligne retirée ou couleur changée à la main entre-temps */
       var t = r.cands[0], movePart = t.part !== top0.part && canonPart(b.part) !== canonPart(t.part) || t.inSet && b.part !== t.part;
       if (r.col === b.color && !movePart) { b.flag = r.flag || ""; b.sug = r.sug; if (t.alias && !b.alias) b.alias = t.alias; bkSave(); renderBasket(); return; }
       if (wasNew) {                                              /* ligne créée par ce scan : on la corrige sur place */
@@ -4352,7 +4366,7 @@ window.bkDedupe = function () {
         _ba(r.cands, r.col, th, r.sug); var n = sameRow(t, r.col); if (n) n.flag = r.flag || "";
       }
       bkSave(); renderBasket();
-    }).catch(function () {});
+    }).catch(done);
   };
   var _rbk = renderBasket;
   renderBasket = function () {
@@ -4360,6 +4374,7 @@ window.bkDedupe = function () {
     document.querySelectorAll(".bk-item[data-id]").forEach(function (el) {
       var b = basket.find(function (x) { return String(x.id) === el.dataset.id; });
       if (b && b.flag && !el.querySelector(".bk-flag")) { var g = el.querySelector(".bk-top .grow"); if (g) g.insertAdjacentHTML("beforeend", '<div class="bk-flag ' + (b.flag === "uniq" ? "ok" : "") + '">' + esc(scanFlagText(b.flag)) + "</div>"); }
+      if (b && b.chk && !el.querySelector(".bk-chk")) { var g2 = el.querySelector(".bk-top .grow"); if (g2) g2.insertAdjacentHTML("beforeend", '<div class="bk-chk">⏳ vérification…</div>'); }
     });
   };
   /* une couleur choisie à la main sur la ligne efface l'avertissement */
@@ -4371,6 +4386,7 @@ window.bkDedupe = function () {
     _show(items);
     if (!items || !items.length || !rbKey) return;
     var arr = cand, col0 = curCol, note0 = colorNote, c = arr.map(function (x) { return { part: x.part, name: x.name, img: x.img, score: x.score }; });
+    window.__lastScanT = Date.now();
     smartPick(c, curCol, modeNow(), suggested.slice()).then(function (r) {
       if (cand !== arr || curCol !== col0) return;               /* nouveau scan ou couleur choisie à la main entre-temps */
       if (r.col !== curCol && r.col != null) updateSelectedColor(r.col);
